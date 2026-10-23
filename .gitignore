@@ -1,27 +1,54 @@
-# Binaries & build outputs
+# Binaries
+cmd/api-baseline/api-baseline
+cmd/api-optimized/api-optimized
+cmd/worker/worker
+cmd/warroom-controller/warroom-controller
+*.exe
+*.dll
+*.so
+*.dylib
 bin/
 dist/
-*.exe
-*.out
-*.test
-*.prof
-coverage.txt
 
-# Environment & secrets
+# Go
+*.test
+*.out
+vendor/
+go.sum
+
+# Node.js
+node_modules/
+.next/
+out/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+
+# Environment & Secrets
 .env
 .env.local
 .env.*.local
-*.pem
-*.key
 
-# Node / Next.js
-web/node_modules/
-web/.next/
-web/out/
-node_modules/
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
 
-# Scratch & runtime data
-.superpowers/
-tmp/
+# OS
+.DS_Store
+Thumbs.db
+
+# Load test results
+loadtests/results/**/*.json
+loadtests/results/**/*.html
+!loadtests/results/.gitkeep
+
+# Logs
 *.log
-/tmp/
+
+# Temporary
+tmp/
+temp/

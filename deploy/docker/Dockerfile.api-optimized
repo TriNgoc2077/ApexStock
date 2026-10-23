@@ -1,0 +1,26 @@
+# Stage 1: Build
+FROM golang:1.22-alpine AS builder
+
+WORKDIR /build
+
+COPY go.mod go.sum ./
+RUN go mod download
+
+COPY . .
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /build/bin/api-optimized ./cmd/api-optimized
+
+# Stage 2: Runtime
+FROM alpine:3.19
+
+RUN apk --no-cache add ca-certificates tzdata
+
+WORKDIR /app
+
+COPY --from=builder /build/bin/api-optimized /app/api-optimized
+
+EXPOSE 8082
+
+HEALTHCHECK --interval=10s --timeout=3s --start-period=5s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://localhost:8082/healthz || exit 1
+
+CMD ["/app/api-optimized"]
