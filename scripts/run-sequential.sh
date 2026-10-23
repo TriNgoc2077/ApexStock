@@ -7,8 +7,25 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
+# Nạp file .env nếu có (tiện cho việc cấu hình ANTHROPIC_API_KEY / ANTHROPIC_BASE_URL)
+if [ -f .env ]; then
+  set -a
+  # shellcheck source=/dev/null
+  source .env
+  set +a
+fi
+
+# 1. Tối ưu mạng chống ECONNRESET & rớt socket TCP trên Linux:
+# Ưu tiên IPv4 trước IPv6 giải quyết triệt để lỗi DNS/socket hang khi qua proxy/Cloudflare
+export NODE_OPTIONS="${NODE_OPTIONS:-} --dns-result-order=ipv4first"
+export UV_THREADPOOL_SIZE=16
+
+# 2. Tối ưu timeout và retry chống gián đoạn trên sub2api:
 export CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1
-export API_TIMEOUT_MS=300000
+export API_TIMEOUT_MS=300000                        # 5 phút timeout cho request dài
+export CLAUDE_STREAM_FIRST_BYTE_TIMEOUT_MS=300000   # 5 phút chờ byte đầu tiên (tránh proxy buffer làm rớt kết nối)
+export CLAUDE_STREAM_IDLE_TIMEOUT_MS=300000         # 5 phút idle stream
+export CLAUDE_CODE_MAX_RETRIES=5                    # Tự động retry tối đa 5 lần nếu gặp sự cố mạng tạm thời
 
 # Commit do agent tạo mang tên claude[bot] (liên kết với GitHub App của Claude để hiện avatar và badge bot).
 export GIT_AUTHOR_NAME="claude[bot]"
