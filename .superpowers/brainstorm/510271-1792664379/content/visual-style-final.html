@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<title>ApexStock – Phong cách chốt: A + M3 + M4</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  @property --ang { syntax:'<angle>'; initial-value:0deg; inherits:false; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:Inter,system-ui,sans-serif; background:#0b0b0f; color:#e8e8ee; }
+  header.top { padding:22px 40px 8px; } header.top h1 { font-size:20px; margin:0; } header.top p { margin:4px 0 0; color:#8a8a99; font-size:14px; }
+  .grid { display:grid; grid-template-columns:1fr 1fr; gap:28px; padding:18px 40px 40px; }
+  .cap { font-size:12px; letter-spacing:.12em; text-transform:uppercase; color:#8a8a99; margin-bottom:10px; }
+
+  .F { --bg:#000; --fg:#ededed; --mu:#8b8b96; --bd:#1f1f24; --card:#0a0a0a; --grid:rgba(255,255,255,.045);
+       --g1:#ff2fb9; --g2:#7c5cff; --g3:#2fd2ff; --glass:rgba(255,255,255,.06); --gb:rgba(255,255,255,.16); --aur:.55; --spot:rgba(124,92,255,.22); }
+  .F[data-theme="light"] { --bg:#fff; --fg:#111; --mu:#666; --bd:#e7e7ea; --card:#fafafa; --grid:rgba(0,0,0,.045);
+       --glass:rgba(255,255,255,.6); --gb:rgba(255,255,255,.95); --aur:.33; --spot:rgba(124,92,255,.12); }
+  .stage { position:relative; overflow:hidden; height:640px; padding:22px; display:flex; flex-direction:column; gap:14px; border-radius:20px;
+       background:var(--bg); color:var(--fg); border:1px solid var(--bd);
+       background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px); background-size:32px 32px; }
+  .stage > *:not(.fx) { position:relative; z-index:1; }
+  .mu { color:var(--mu); font-size:12px; }
+  .nav { display:flex; justify-content:space-between; align-items:center; font-size:13px; }
+  .kbd { font-family:'JetBrains Mono'; font-size:10px; border:1px solid var(--bd); padding:2px 6px; border-radius:6px; color:var(--mu); }
+  .tag { font-family:'JetBrains Mono'; font-size:11px; padding:4px 10px; border-radius:99px; border:1px solid var(--bd); color:var(--mu); width:max-content; display:flex; gap:6px; align-items:center; background:var(--glass); backdrop-filter:blur(10px); }
+  .dot { width:7px; height:7px; border-radius:50%; background:#22e08a; box-shadow:0 0 10px #22e08a; animation:pulse 1.6s infinite; }
+  @keyframes pulse { 50% { opacity:.3 } }
+  h2 { font-size:40px; letter-spacing:-.05em; margin:0; font-weight:800; }
+  .row { display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; }
+  .card { background:var(--card); border:1px solid var(--bd); border-radius:14px; padding:14px; }
+  .glass { background:var(--glass); border-color:var(--gb); backdrop-filter:blur(20px); }
+  .timer { font-family:'JetBrains Mono'; font-size:24px; font-variant-numeric:tabular-nums; }
+  .between { display:flex; justify-content:space-between; align-items:center; }
+  .bar { height:8px; border-radius:99px; overflow:hidden; background:var(--bd); }
+  .bar > i { display:block; height:100%; background:var(--fg); animation:drain 6s ease-in-out infinite alternate; }
+  @keyframes drain { from{width:68%} to{width:9%} }
+  .products { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  .thumb { height:58px; border-radius:10px; background:linear-gradient(135deg,var(--bd),transparent); margin-bottom:10px; display:flex; align-items:center; justify-content:center; font-size:26px; }
+
+  /* M4: aurora hero */
+  .fx.aurora { position:absolute; left:0; right:0; top:0; height:260px; overflow:hidden; z-index:0; }
+  .fx.aurora::before { content:""; position:absolute; inset:-60%; filter:blur(40px); opacity:var(--aur);
+      background:conic-gradient(from 0deg at 50% 50%, var(--g1), var(--g2), var(--g3), var(--g2), var(--g1)); animation:rot 14s linear infinite; }
+  .fx.aurora::after { content:""; position:absolute; inset:0; background:linear-gradient(to bottom, transparent 25%, var(--bg)); }
+  @keyframes rot { to { transform:rotate(360deg); } }
+
+  /* M3: spotlight + spin border + fill button */
+  .fx.spot { position:absolute; inset:0; pointer-events:none; opacity:0; transition:opacity .3s; z-index:0;
+      background:radial-gradient(280px circle at var(--mx,50%) var(--my,50%), var(--spot), transparent 70%); }
+  .stage:hover .fx.spot { opacity:1; }
+  .spin { border:1px solid transparent; animation:spin 4s linear infinite;
+      background:linear-gradient(var(--card),var(--card)) padding-box, conic-gradient(from var(--ang), transparent 0 65%, var(--g1), var(--g2), var(--g3), transparent) border-box; }
+  @keyframes spin { to { --ang:360deg; } }
+  .btn { border:1px solid var(--bd); background:transparent; color:var(--fg); padding:13px; border-radius:12px; font:600 14px Inter; cursor:pointer; position:relative; overflow:hidden; isolation:isolate; transition:color .3s, border-color .3s; }
+  .btn::before { content:""; position:absolute; inset:0; z-index:-1; background:linear-gradient(90deg,var(--g1),var(--g2),var(--g3)); transform:scaleX(0); transform-origin:left; transition:transform .5s cubic-bezier(.2,.8,.2,1); }
+  .btn:hover { color:#fff; border-color:transparent; } .btn:hover::before { transform:scaleX(1); }
+  .btn.primary { background:var(--fg); color:var(--bg); border-color:var(--fg); }
+  .btn.primary:hover { color:#fff; }
+  .note { color:#8a8a99; font-size:13px; line-height:1.6; margin-top:10px; }
+</style>
+</head>
+<body>
+<header class="top">
+  <h1>Phong cách chốt: nền A + animation của M3 và M4</h1>
+  <p>Hai bản dưới là cùng một thiết kế ở theme tối và sáng · Rê chuột lên khung để thấy đèn rọi · Rê lên nút để thấy hiệu ứng đổ màu</p>
+</header>
+<div class="grid">
+  <div data-theme="dark" class="F" data-choice="final-dark" onclick="toggleSelect(this)">
+    <div class="cap">Theme tối</div>
+    <div class="stage" onmousemove="var r=this.getBoundingClientRect();this.style.setProperty('--mx',(event.clientX-r.left)+'px');this.style.setProperty('--my',(event.clientY-r.top)+'px')">
+      <div class="fx aurora"></div><div class="fx spot"></div>
+      <div class="nav"><b>▲ ApexStock</b><span class="mu" style="display:flex;gap:10px;align-items:center">Sản phẩm · Đơn hàng · Giỏ (2) <span class="kbd">⌘K</span> ☾</span></div>
+      <div style="height:18px"></div>
+      <span class="tag"><span class="dot"></span>LIVE · 12,483 người đang xem</span>
+      <h2>Flash Sale 12.12</h2>
+      <div class="row">
+        <div class="card glass"><div class="mu">Kết thúc sau</div><div class="timer t">00:14:59</div></div>
+        <div class="card glass"><div class="mu">Đã bán</div><div class="timer">8,412</div></div>
+        <div class="card glass"><div class="mu">Đơn/giây</div><div class="timer">1,207</div></div>
+      </div>
+      <div class="card spin">
+        <div class="between"><b>🔥 iPhone 17 Pro · 256GB</b><span><s class="mu">32.990.000</s> <b>19.990.000₫</b></span></div>
+        <div class="mu" style="margin:10px 0 6px">Còn lại trong kho</div><div class="bar"><i></i></div>
+      </div>
+      <div class="products">
+        <div class="card"><div class="thumb">🎧</div><div class="between"><span>AirPods Pro 3</span><b>3.990k</b></div></div>
+        <div class="card"><div class="thumb">⌚</div><div class="between"><span>Watch Ultra 3</span><b>12.490k</b></div></div>
+      </div>
+      <div style="display:grid;grid-template-columns:2fr 1fr;gap:12px"><button class="btn primary">Mua ngay →</button><button class="btn">+ Giỏ hàng</button></div>
+    </div>
+  </div>
+  <div data-theme="light" class="F" data-choice="final-light" onclick="toggleSelect(this)">
+    <div class="cap">Theme sáng</div>
+    <div class="stage" onmousemove="var r=this.getBoundingClientRect();this.style.setProperty('--mx',(event.clientX-r.left)+'px');this.style.setProperty('--my',(event.clientY-r.top)+'px')">
+      <div class="fx aurora"></div><div class="fx spot"></div>
+      <div class="nav"><b>▲ ApexStock</b><span class="mu" style="display:flex;gap:10px;align-items:center">Sản phẩm · Đơn hàng · Giỏ (2) <span class="kbd">⌘K</span> ☀</span></div>
+      <div style="height:18px"></div>
+      <span class="tag"><span class="dot"></span>LIVE · 12,483 người đang xem</span>
+      <h2>Flash Sale 12.12</h2>
+      <div class="row">
+        <div class="card glass"><div class="mu">Kết thúc sau</div><div class="timer t">00:14:59</div></div>
+        <div class="card glass"><div class="mu">Đã bán</div><div class="timer">8,412</div></div>
+        <div class="card glass"><div class="mu">Đơn/giây</div><div class="timer">1,207</div></div>
+      </div>
+      <div class="card spin">
+        <div class="between"><b>🔥 iPhone 17 Pro · 256GB</b><span><s class="mu">32.990.000</s> <b>19.990.000₫</b></span></div>
+        <div class="mu" style="margin:10px 0 6px">Còn lại trong kho</div><div class="bar"><i></i></div>
+      </div>
+      <div class="products">
+        <div class="card"><div class="thumb">🎧</div><div class="between"><span>AirPods Pro 3</span><b>3.990k</b></div></div>
+        <div class="card"><div class="thumb">⌚</div><div class="between"><span>Watch Ultra 3</span><b>12.490k</b></div></div>
+      </div>
+      <div style="display:grid;grid-template-columns:2fr 1fr;gap:12px"><button class="btn primary">Mua ngay →</button><button class="btn">+ Giỏ hàng</button></div>
+    </div>
+  </div>
+</div>
+<p class="note" style="padding:0 40px 30px">Quy tắc thiết kế rút ra: <b>nền, lưới, font, nút</b> theo A · <b>dải cực quang + thẻ kính mờ</b> chỉ ở đầu trang (M4) · <b>đèn rọi theo chuột</b> trên toàn trang, <b>viền gradient chạy</b> chỉ cho sản phẩm đang hot, <b>nút đổ màu gradient</b> khi hover (M3) · Màu gradient hồng–tím–xanh là màu thương hiệu duy nhất.</p>
+<script>
+  let s = 899;
+  setInterval(() => { s = s > 0 ? s - 1 : 899;
+    const t = '00:' + String(Math.floor(s/60)).padStart(2,'0') + ':' + String(s%60).padStart(2,'0');
+    document.querySelectorAll('.t').forEach(e => e.textContent = t); }, 1000);
+</script>
+</body>
+</html>

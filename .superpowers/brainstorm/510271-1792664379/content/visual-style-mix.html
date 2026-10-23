@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="vi" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<title>ApexStock – Bản mix A + B</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  :root { --page-bg:#0b0b0f; --page-fg:#e8e8ee; --muted:#8a8a99; }
+  [data-theme="light"] { --page-bg:#f4f4f7; --page-fg:#14141a; --muted:#5d5d6b; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:Inter,system-ui,sans-serif; background:var(--page-bg); color:var(--page-fg); transition:background .4s,color .4s; }
+  header.top { display:flex; justify-content:space-between; align-items:center; padding:24px 40px; }
+  header.top h1 { font-size:20px; margin:0; } header.top p { margin:4px 0 0; color:var(--muted); font-size:14px; }
+  .toggle { cursor:pointer; border:1px solid var(--muted); background:transparent; color:var(--page-fg); padding:8px 16px; border-radius:999px; font:inherit; }
+  .grid { display:grid; grid-template-columns:repeat(2,1fr); gap:28px; padding:0 40px 40px; max-width:1300px; margin:auto; }
+  .choice { border-radius:20px; overflow:hidden; cursor:pointer; outline:3px solid transparent; transition:outline-color .2s, transform .2s; }
+  .choice:hover { transform:translateY(-4px); } .choice.selected { outline-color:#7c5cff; }
+  .label { padding:14px 4px 0; } .label h3 { margin:0; font-size:16px; } .label p { margin:4px 0 0; color:var(--muted); font-size:13px; line-height:1.55; }
+
+  /* shared tokens: A-base */
+  .M { --bg:#000; --fg:#ededed; --mu:#8b8b96; --bd:rgba(255,255,255,.09); --card:rgba(255,255,255,.03); --grid:rgba(255,255,255,.05);
+       --g1:#ff2fb9; --g2:#7c5cff; --g3:#2fd2ff; }
+  [data-theme="light"] .M { --bg:#fff; --fg:#111; --mu:#666; --bd:rgba(0,0,0,.09); --card:rgba(255,255,255,.7); --grid:rgba(0,0,0,.045); }
+  .stage { position:relative; overflow:hidden; height:520px; padding:22px; display:flex; flex-direction:column; gap:14px;
+           background:var(--bg); color:var(--fg); border:1px solid var(--bd); border-radius:20px;
+           background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px); background-size:32px 32px; }
+  .stage > *:not(.fx) { position:relative; z-index:1; }
+  .nav { display:flex; justify-content:space-between; align-items:center; font-size:13px; }
+  .mu { color:var(--mu); font-size:12px; }
+  .pill { font-family:'JetBrains Mono'; font-size:11px; border:1px solid var(--bd); padding:4px 10px; border-radius:99px; color:var(--mu); width:max-content; display:flex; gap:6px; align-items:center; }
+  .dot { width:7px; height:7px; border-radius:50%; background:#22e08a; box-shadow:0 0 10px #22e08a; animation:pulse 1.6s infinite; }
+  @keyframes pulse { 50% { opacity:.3 } }
+  h2 { font-size:34px; letter-spacing:-.045em; margin:0; font-weight:800; }
+  .grad { background:linear-gradient(90deg,var(--g1),var(--g2),var(--g3)); -webkit-background-clip:text; color:transparent; background-size:200% 100%; animation:shift 6s linear infinite; }
+  @keyframes shift { to { background-position:200% 0; } }
+  .row { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  .card { background:var(--card); border:1px solid var(--bd); border-radius:14px; padding:14px; backdrop-filter:blur(14px); }
+  .timer { font-family:'JetBrains Mono'; font-size:26px; font-variant-numeric:tabular-nums; }
+  .bar { height:8px; border-radius:99px; overflow:hidden; background:var(--bd); }
+  .bar > i { display:block; height:100%; animation:drain 6s ease-in-out infinite alternate; background:linear-gradient(90deg,var(--g1),var(--g2),var(--g3)); }
+  @keyframes drain { from{width:68%} to{width:9%} }
+  .btn { border:none; padding:13px; border-radius:12px; font-weight:600; font-size:14px; cursor:pointer; color:#fff; position:relative; }
+
+  /* ===== M1: A + điểm nhấn B (tiết chế) ===== */
+  .M1 .fx.glow { position:absolute; inset:-30% -10% auto; height:70%; z-index:0;
+      background:radial-gradient(ellipse at 50% 0%, rgba(124,92,255,.38), transparent 60%); }
+  [data-theme="light"] .M1 .fx.glow { background:radial-gradient(ellipse at 50% 0%, rgba(124,92,255,.18), transparent 60%); }
+  .M1 .btn { background:var(--fg); color:var(--bg); }
+  .M1 .btn::after { content:""; position:absolute; inset:-1px; border-radius:13px; z-index:-1;
+      background:linear-gradient(90deg,var(--g1),var(--g2),var(--g3)); filter:blur(10px); opacity:.55; }
+  .M1 .hot { border-color:transparent; background:
+      linear-gradient(var(--bg),var(--bg)) padding-box,
+      linear-gradient(120deg,var(--g1),var(--g2),var(--g3)) border-box; border:1px solid transparent; }
+
+  /* ===== M2: A + B cân bằng (nhiều hiệu ứng hơn) ===== */
+  .M2 .fx.blob { position:absolute; border-radius:50%; filter:blur(70px); z-index:0; animation:float 10s ease-in-out infinite alternate; }
+  .M2 .b1 { width:260px;height:260px;background:var(--g1);top:-90px;right:-60px;opacity:.35; }
+  .M2 .b2 { width:280px;height:280px;background:var(--g3);bottom:-120px;left:-80px;opacity:.3;animation-delay:-4s; }
+  .M2 .b3 { width:200px;height:200px;background:var(--g2);top:35%;left:45%;opacity:.3;animation-delay:-7s; }
+  [data-theme="light"] .M2 .fx.blob { opacity:.22; }
+  @keyframes float { to { transform:translate(-40px,30px) scale(1.15); } }
+  .M2 .btn { background:linear-gradient(90deg,var(--g1),var(--g2)); box-shadow:0 0 26px rgba(124,92,255,.45); }
+  .M2 .timer { text-shadow:0 0 16px rgba(255,47,185,.6); }
+  .M2 .spot { position:relative; overflow:hidden; }
+  .M2 .spot::before { content:""; position:absolute; inset:0; background:linear-gradient(110deg,transparent 30%,rgba(255,255,255,.12) 50%,transparent 70%); transform:translateX(-100%); animation:shine 3.5s infinite; }
+  @keyframes shine { to { transform:translateX(100%); } }
+</style>
+</head>
+<body>
+<header class="top">
+  <div>
+    <h1>Hai mức pha trộn A + B. Mức nào vừa ý bạn?</h1>
+    <p>Cả hai đều lấy bố cục, lưới và font số liệu của A; chỉ khác "liều lượng" hiệu ứng của B · Nhớ thử theme sáng</p>
+  </div>
+  <button class="toggle" onclick="var h=document.documentElement;h.dataset.theme=h.dataset.theme==='dark'?'light':'dark';this.textContent=h.dataset.theme==='dark'?'☀ Theme sáng':'☾ Theme tối'">☀ Theme sáng</button>
+</header>
+
+<div class="grid">
+  <div>
+    <div class="choice M M1" data-choice="M1-tiet-che" onclick="toggleSelect(this)">
+      <div class="stage">
+        <div class="fx glow"></div>
+        <div class="nav"><b>▲ ApexStock</b><span class="mu">Sản phẩm · Đơn hàng · Giỏ (2) · ⌘K</span></div>
+        <div class="pill"><span class="dot"></span>LIVE · 12,483 người đang xem</div>
+        <h2>Flash Sale <span class="grad">12.12</span></h2>
+        <div class="row">
+          <div class="card"><div class="mu">Kết thúc sau</div><div class="timer t">00:14:59</div></div>
+          <div class="card"><div class="mu">Đã bán</div><div class="timer">8,412</div></div>
+        </div>
+        <div class="card hot">
+          <div style="display:flex;justify-content:space-between"><b>iPhone 17 Pro · 256GB</b><span><s class="mu">32.990.000</s> <b>19.990.000₫</b></span></div>
+          <div class="mu" style="margin:10px 0 6px">Còn lại trong kho</div>
+          <div class="bar"><i></i></div>
+        </div>
+        <button class="btn">Mua ngay →</button>
+      </div>
+    </div>
+    <div class="label"><h3>M1 · Tiết chế: "A là chính, B làm điểm nhấn"</h3>
+      <p>Nền đen tối giản như A. Màu gradient của B chỉ xuất hiện ở <b>3 chỗ quan trọng</b>: chữ "12.12", viền thẻ sản phẩm đang hot và vầng sáng sau nút Mua. Chuyên nghiệp, an toàn trước hội đồng mà vẫn có chất riêng.</p></div>
+  </div>
+
+  <div>
+    <div class="choice M M2" data-choice="M2-can-bang" onclick="toggleSelect(this)">
+      <div class="stage">
+        <div class="fx blob b1"></div><div class="fx blob b2"></div><div class="fx blob b3"></div>
+        <div class="nav"><b>▲ ApexStock</b><span class="mu">Sản phẩm · Đơn hàng · Giỏ (2) · ⌘K</span></div>
+        <div class="pill"><span class="dot"></span>LIVE · 12,483 người đang xem</div>
+        <h2>Flash Sale <span class="grad">12.12</span></h2>
+        <div class="row">
+          <div class="card"><div class="mu">Kết thúc sau</div><div class="timer t">00:14:59</div></div>
+          <div class="card"><div class="mu">Đã bán</div><div class="timer">8,412</div></div>
+        </div>
+        <div class="card spot">
+          <div style="display:flex;justify-content:space-between"><b>iPhone 17 Pro · 256GB</b><span><s class="mu">32.990.000</s> <b>19.990.000₫</b></span></div>
+          <div class="mu" style="margin:10px 0 6px">⚡ Đang cháy hàng</div>
+          <div class="bar"><i></i></div>
+        </div>
+        <button class="btn">Mua ngay ⚡</button>
+      </div>
+    </div>
+    <div class="label"><h3>M2 · Cân bằng: "A làm khung, B làm không khí"</h3>
+      <p>Giữ khung và font của A, nhưng thêm các khối màu trôi nổi (đã giảm độ đậm), thẻ kính mờ, vệt sáng lướt qua thẻ sản phẩm, nút gradient phát sáng. Sống động hơn nhưng không "chói" như B gốc.</p></div>
+  </div>
+</div>
+<script>
+  let s = 899;
+  setInterval(() => { s = s > 0 ? s - 1 : 899;
+    const t = '00:' + String(Math.floor(s/60)).padStart(2,'0') + ':' + String(s%60).padStart(2,'0');
+    document.querySelectorAll('.t').forEach(e => e.textContent = t); }, 1000);
+</script>
+</body>
+</html>
