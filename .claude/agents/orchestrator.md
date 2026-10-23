@@ -64,7 +64,7 @@ Với mỗi **Stage X**, thực hiện tuần tự 5 bước sau và **KHÔNG d�
 - Cập nhật Ledger: Stage X `COMPLETED`, `Current Phase = COMMITTED`, `Last Completed Stage = X`, thêm mục vào *Stage Execution Log*; cột Commit SHA của Stage X-1 điền SHA thật nếu trước đó còn trống.
 - Commit chính của stage (gồm review fixes + ledger):
   `git add -A && git commit -m "feat(stage-X): <mô tả ngắn>"`
-- Danh tính commit (`Claude <noreply@anthropic.com>`) đã được `scripts/run-sequential.sh` đặt qua biến môi trường `GIT_AUTHOR_*`/`GIT_COMMITTER_*`. **Không** chạy `git config user.*`, không `git push`, không `--amend` commit cũ.
+- Danh tính commit (`claude[bot] <209825114+claude[bot]@users.noreply.github.com>`) đã được `scripts/run-sequential.sh` đặt qua biến môi trường `GIT_AUTHOR_*`/`GIT_COMMITTER_*`. **Không** chạy `git config user.*`, không `git push`, không `--amend` commit cũ.
 
 ### Bước 5: NEXT STAGE
 - In ra 3 dòng tóm tắt tiến độ Stage X và **lập tức bắt đầu Stage X+1** cho đến khi hoàn tất Stage 13.

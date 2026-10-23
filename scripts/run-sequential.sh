@@ -10,12 +10,11 @@ cd "$(dirname "$0")/.."
 export CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1
 export API_TIMEOUT_MS=300000
 
-# Commit do agent tạo mang tên Claude (chỉ áp dụng trong phiên này,
-# không đổi git config của bạn).
-export GIT_AUTHOR_NAME="Claude"
-export GIT_AUTHOR_EMAIL="noreply@anthropic.com"
-export GIT_COMMITTER_NAME="Claude"
-export GIT_COMMITTER_EMAIL="noreply@anthropic.com"
+# Commit do agent tạo mang tên claude[bot] (liên kết với GitHub App của Claude để hiện avatar và badge bot).
+export GIT_AUTHOR_NAME="claude[bot]"
+export GIT_AUTHOR_EMAIL="209825114+claude[bot]@users.noreply.github.com"
+export GIT_COMMITTER_NAME="claude[bot]"
+export GIT_COMMITTER_EMAIL="209825114+claude[bot]@users.noreply.github.com"
 
 # Pre-flight
 for bin in claude git go docker node npm; do

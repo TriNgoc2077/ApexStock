@@ -45,7 +45,7 @@ bash -n scripts/**/*.sh
 
 ## Commit
 
-- Danh tính commit lấy từ biến môi trường do `scripts/run-sequential.sh` đặt (`Claude <noreply@anthropic.com>`). Không chạy `git config` để đổi danh tính.
+- Danh tính commit lấy từ biến môi trường do `scripts/run-sequential.sh` đặt (`claude[bot] <209825114+claude[bot]@users.noreply.github.com>`). Không chạy `git config` để đổi danh tính.
 - Hai commit mỗi stage: `wip(stage-X): implement ...` sau IMPLEMENT và `feat(stage-X): ...` sau VERIFY.
 - Không commit `node_modules`, `.next`, binary, `.env`, raw k6 output lớn (chỉ commit summary/metadata trong evidence pack).
 - Không `git push`, không rewrite history, không `--no-verify`.
