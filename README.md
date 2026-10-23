@@ -135,21 +135,32 @@ go test -race ./...
 # Build Docker images
 docker compose -f deploy/compose/docker-compose.yaml build
 
+# Run migrations & seed data
+make db-migrate
+make db-seed
+
+# Warm up Redis cache
+make db-warmup
+
+# Reset all data
+make db-reset
+
 # View logs
 docker compose -f deploy/compose/docker-compose.yaml logs -f api-baseline
 ```
 
----
-
-## Stage 1 Status
-
-✅ Docker Compose foundation with profiles  
-✅ Go module skeleton (4 services)  
-✅ Next.js app shell  
-✅ Health/readiness endpoints  
-✅ PostgreSQL init (2 databases)  
-✅ Resource limits per `benchmark-matrix.yaml`
+**Note:** Database scripts require PostgreSQL container running. Use `POSTGRES_HOST=localhost POSTGRES_PORT=5432` to run from host when port is exposed, or run inside Compose network.
 
 ---
 
-**Next Stage:** Stage 2 — PostgreSQL migrations, Redis keyspace, seed/reset scripts
+## Stage 2 Status
+
+✅ PostgreSQL schema migrations (shared across 2 DBs per D0.15)  
+✅ Redis Lua scripts (reserve/release/confirm/rate-limit)  
+✅ Deterministic seed data (50K users, flash-sale events, 10K stock)  
+✅ Reset/warmup/reconciliation scripts  
+✅ Idempotency keys and inventory state model (I1–I5)
+
+---
+
+**Next Stage:** Stage 3 — Baseline API implementation

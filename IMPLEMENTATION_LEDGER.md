@@ -8,12 +8,12 @@
 ## 1. Trạng thái thực thi hiện tại (Current Execution State)
 
 - **Overall Status:** `IN_PROGRESS`
-- **Current Stage:** `Stage 1`
+- **Current Stage:** `Stage 2`
 - **Execution Mode:** `SEQUENTIAL` — một orchestrator duy nhất, chạy Stage 1 → Stage 13, mỗi lần một subagent
 - **Current Phase:** `VERIFY` (`READY` | `IMPLEMENT` | `CHECKPOINT_COMMITTED` | `REVIEW_ROUND_1` | `REVIEW_ROUND_2` | `VERIFY` | `COMMITTED`)
 - **Base Commit SHA:** `91ce71c` (stage-0)
-- **Last Completed Stage:** `Stage 0`
-- **Last Completed Commit SHA:** `91ce71c`
+- **Last Completed Stage:** `Stage 1`
+- **Last Completed Commit SHA:** `8ce7d19`
 
 ---
 
@@ -44,8 +44,8 @@
 | Stage | Tên Stage | Phụ thuộc | Primary Agent | Support Agent(s) | Reviewer | Status | Fix Rounds | Commit SHA |
 |---:|---|---|---|---|---|---|---:|---|
 | **0** | Contract, decision gate & skeleton docs | None | `stages-planner` / `backend-core` | `infra-devops` | `code-reviewer` | `COMPLETED` | 0 | `91ce71c` |
-| **1** | Host foundation, Docker Compose & health slice | Stage 0 | `infra-devops` | `backend-core`, `frontend-ui` | `code-reviewer` | `VERIFY` | 0 | - |
-| **2** | PostgreSQL migration, Redis keyspace & seed/reset | Stage 1 | `backend-core` | `infra-devops` | `code-reviewer` | `PENDING` | 0 | - |
+| **1** | Host foundation, Docker Compose & health slice | Stage 0 | `infra-devops` | `backend-core`, `frontend-ui` | `code-reviewer` | `COMPLETED` | 0 | `8ce7d19` |
+| **2** | PostgreSQL migration, Redis keyspace & seed/reset | Stage 1 | `backend-core` | `infra-devops` | `code-reviewer` | `VERIFY` | 0 | - |
 | **3** | Baseline order vertical slice | Stage 2 | `backend-core` | - | `code-reviewer` | `PENDING` | 0 | - |
 | **4** | Optimized reservation, idempotency, NATS & worker | Stage 2, 3 | `backend-core` | `infra-devops` | `code-reviewer` | `PENDING` | 0 | - |
 | **5** | Payment simulator, confirm/fail/timeout/cancel & restock | Stage 3, 4 | `backend-core` | `payment-integrations` | `code-reviewer` | `PENDING` | 0 | - |
@@ -104,5 +104,38 @@ bash -n scripts/**/*.sh     # PASS
 - ✅ No exposed ports to host (default)
 - ✅ Resource limits applied
 - ✅ Fixed service names/URLs
+
+**Commit SHA:** `8ce7d19`
+
+### Stage 2: PostgreSQL migration, Redis keyspace & seed/reset
+
+**Phase:** VERIFY (pending commit)  
+**Primary Agent:** backend-core  
+**Deliverables:**
+- Shared PostgreSQL migration for both isolated databases
+- Deterministic seed: 50,000 users, active event, 10,000 stock
+- Redis key helpers and atomic Lua scripts for reserve/release/confirm/rate-limit
+- Redis warm-up, reset and SQL reconciliation scripts
+- Makefile targets and README instructions for database lifecycle
+
+**Verification:**
+```bash
+gofmt -l .                         # PASS
+go vet ./...                       # PASS
+go test -race ./...                # PASS (no test files)
+bash -n scripts/*.sh               # PASS
+docker compose config -q            # PASS (agent verification)
+```
+
+**Runtime note:** Host execution requires overriding `POSTGRES_HOST`/`POSTGRES_PORT` to a published PostgreSQL endpoint; defaults use Compose service names (`postgres`, `redis`) intentionally. Compose does not publish database/Redis ports by default.
+
+**Correctness fixes:** Script password defaults aligned with Compose (`apexstock`); Redis reset now uses explicit `redis-cli` commands instead of feeding SQL-style comments to the Redis CLI.
+
+**Acceptance:**
+- ✅ Shared migration applies to both databases (D0.15)
+- ✅ Deterministic logical IDs and seed manifest
+- ✅ Active event and inventory snapshot
+- ✅ No invalid `now()` partial-index predicate (D0.8)
+- ✅ Reset and reconciliation tooling
 
 **Commit SHA:** (pending)
