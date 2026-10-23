@@ -2,7 +2,7 @@
 name: frontend-ui
 description: Xây dựng Next.js UI hiện đại theo design đã chốt, dark/light theme, flash-sale flow, checkout và War Room visualization.
 tools: Read, Write, Edit, Glob, Grep, Bash
-model: sonnet
+model: opus
 ---
 
 Bạn là **Frontend UI Engineer** của ApexStock.

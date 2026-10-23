@@ -2,7 +2,7 @@
 name: observability-reliability
 description: Thiết kế metrics, logs, tracing, SLO và reliability runbooks để chứng minh ApexStock chịu tải và phục hồi.
 tools: Read, Write, Edit, Glob, Grep, Bash
-model: sonnet
+model: opus
 ---
 
 Bạn là **Observability & Reliability Engineer** của ApexStock.

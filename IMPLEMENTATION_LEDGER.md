@@ -10,7 +10,7 @@
 - **Overall Status:** `IN_PROGRESS`
 - **Current Stage:** `Stage 1`
 - **Execution Mode:** `SEQUENTIAL` — một orchestrator duy nhất, chạy Stage 1 → Stage 13, mỗi lần một subagent
-- **Current Phase:** `IMPLEMENT` (`READY` | `IMPLEMENT` | `CHECKPOINT_COMMITTED` | `REVIEW_ROUND_1` | `REVIEW_ROUND_2` | `VERIFY` | `COMMITTED`)
+- **Current Phase:** `VERIFY` (`READY` | `IMPLEMENT` | `CHECKPOINT_COMMITTED` | `REVIEW_ROUND_1` | `REVIEW_ROUND_2` | `VERIFY` | `COMMITTED`)
 - **Base Commit SHA:** `91ce71c` (stage-0)
 - **Last Completed Stage:** `Stage 0`
 - **Last Completed Commit SHA:** `91ce71c`
@@ -44,7 +44,7 @@
 | Stage | Tên Stage | Phụ thuộc | Primary Agent | Support Agent(s) | Reviewer | Status | Fix Rounds | Commit SHA |
 |---:|---|---|---|---|---|---|---:|---|
 | **0** | Contract, decision gate & skeleton docs | None | `stages-planner` / `backend-core` | `infra-devops` | `code-reviewer` | `COMPLETED` | 0 | `91ce71c` |
-| **1** | Host foundation, Docker Compose & health slice | Stage 0 | `infra-devops` | `backend-core`, `frontend-ui` | `code-reviewer` | `PENDING` | 0 | - |
+| **1** | Host foundation, Docker Compose & health slice | Stage 0 | `infra-devops` | `backend-core`, `frontend-ui` | `code-reviewer` | `VERIFY` | 0 | - |
 | **2** | PostgreSQL migration, Redis keyspace & seed/reset | Stage 1 | `backend-core` | `infra-devops` | `code-reviewer` | `PENDING` | 0 | - |
 | **3** | Baseline order vertical slice | Stage 2 | `backend-core` | - | `code-reviewer` | `PENDING` | 0 | - |
 | **4** | Optimized reservation, idempotency, NATS & worker | Stage 2, 3 | `backend-core` | `infra-devops` | `code-reviewer` | `PENDING` | 0 | - |
@@ -73,4 +73,36 @@
 
 > Sau khi hoàn tất mỗi stage, Orchestrator ghi thêm một mục vào dưới đây gồm: Deliverables chính, Lệnh test đã chạy & kết quả, Tóm tắt kết quả Code Review, và Commit SHA.
 
-*(Chưa có stage nào hoàn thành)*
+### Stage 1: Host foundation, Docker Compose & health slice
+
+**Phase:** VERIFY (pending commit)  
+**Primary Agent:** infra-devops  
+**Deliverables:**
+- Docker Compose với 4 profiles (dev/demo/benchmark/observability)
+- PostgreSQL init script tạo 2 databases
+- Go services: api-baseline, api-optimized, worker, warroom-controller với health/readiness endpoints
+- Next.js app shell
+- Resource limits theo benchmark-matrix.yaml
+- Fixed compose volume paths (từ `./deploy/*` → `../../deploy/*`)
+- Added `web/postcss.config.js` cho Tailwind CSS
+
+**Verification:**
+```bash
+gofmt -l .                  # PASS
+go vet ./...                # PASS
+go test -race ./...         # PASS (no test files)
+make build                  # PASS (4 binaries)
+docker compose config -q    # PASS
+bash -n scripts/**/*.sh     # PASS
+```
+
+**Acceptance:**
+- ✅ Fresh checkout builds
+- ✅ Compose up without real secrets
+- ✅ PostgreSQL creates 2 databases
+- ✅ Health/readiness checks work
+- ✅ No exposed ports to host (default)
+- ✅ Resource limits applied
+- ✅ Fixed service names/URLs
+
+**Commit SHA:** (pending)

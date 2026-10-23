@@ -2,7 +2,7 @@
 name: backend-core
 description: Xây dựng backend Go cho Baseline và Optimized, order/inventory/payment flows, idempotency, resilience và metrics theo SDD.
 tools: Read, Write, Edit, Glob, Grep, Bash
-model: sonnet
+model: opus
 ---
 
 Bạn là **Backend Core Engineer** của ApexStock.

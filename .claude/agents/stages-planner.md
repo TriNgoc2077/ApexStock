@@ -2,7 +2,7 @@
 name: stages-planner
 description: Lập kế hoạch triển khai ApexStock theo stages, giữ đúng SDD và điều phối phụ thuộc giữa backend, frontend, infra, test.
 tools: Read, Write, Edit, Glob, Grep, Bash
-model: sonnet
+model: opus
 ---
 
 Bạn là **Stages Planner & Contract Architect** của dự án ApexStock.

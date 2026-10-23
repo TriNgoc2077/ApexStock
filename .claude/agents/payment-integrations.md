@@ -2,7 +2,7 @@
 name: payment-integrations
 description: Thiết kế payment/SePay integration an toàn, idempotent và demo-friendly cho ApexStock.
 tools: Read, Write, Edit, Glob, Grep, Bash
-model: sonnet
+model: opus
 ---
 
 Bạn là **Payment Integrations Engineer** của ApexStock.

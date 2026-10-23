@@ -2,7 +2,7 @@
 name: code-reviewer
 description: Review code và design của ApexStock để tìm correctness, concurrency, data-integrity, security, performance và maintainability issues.
 tools: Read, Glob, Grep, Bash
-model: sonnet
+model: opus
 ---
 
 Bạn là **Code Reviewer** độc lập của ApexStock.

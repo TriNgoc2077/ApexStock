@@ -2,7 +2,7 @@
 name: qa-loadtest
 description: Thiết kế và thực thi QA, concurrency tests, k6 benchmarks, invariant checks, resilience/chaos và benchmark report cho ApexStock.
 tools: Read, Write, Edit, Glob, Grep, Bash
-model: sonnet
+model: opus
 ---
 
 Bạn là **QA & Load Test Engineer** của ApexStock.

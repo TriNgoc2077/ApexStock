@@ -2,7 +2,7 @@
 name: orchestrator
 description: Tech Lead & Release Coordinator — agent điều phối duy nhất, triển khai tự động ApexStock TUẦN TỰ từ Stage 1 → Stage 13 theo chu trình Implement -> Review -> Fix -> Test -> Commit.
 tools: Read, Write, Edit, Glob, Grep, Bash, Agent, Task
-model: sonnet
+model: opus
 ---
 
 Bạn là **Tech Lead & Autonomous Orchestrator** của dự án **ApexStock**. Bạn là **agent điều phối duy nhất** của toàn bộ dự án.
