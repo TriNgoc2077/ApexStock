@@ -8,11 +8,12 @@
 ## 1. Trạng thái thực thi hiện tại (Current Execution State)
 
 - **Overall Status:** `IN_PROGRESS`
-- **Current Stage:** `Stage 1 (or Parallel Lanes 1–4)`
-- **Current Phase:** `READY` (`PRE_FLIGHT` | `IMPLEMENT` | `REVIEW_ROUND_1` | `REVIEW_ROUND_2` | `VERIFY` | `COMMITTED`)
-- **Base Commit SHA:** `a154b1a`
+- **Current Stage:** `Stage 1`
+- **Execution Mode:** `SEQUENTIAL` — một orchestrator duy nhất, chạy Stage 1 → Stage 13, mỗi lần một subagent
+- **Current Phase:** `READY` (`READY` | `IMPLEMENT` | `CHECKPOINT_COMMITTED` | `REVIEW_ROUND_1` | `REVIEW_ROUND_2` | `VERIFY` | `COMMITTED`)
+- **Base Commit SHA:** `91ce71c` (stage-0)
 - **Last Completed Stage:** `Stage 0`
-- **Last Completed Commit SHA:** `a154b1a`
+- **Last Completed Commit SHA:** `91ce71c`
 
 ---
 
@@ -34,6 +35,7 @@
 | D0.12 | Không gọi Docker socket từ browser; điều khiển qua Go controller localhost-only có allowlist | LOCKED |
 | D0.13 | Redis cấu hình `noeviction` cho inventory/idempotency keyspace | LOCKED |
 | D0.14 | Next.js App Router dùng `[id]`; WebSocket cho War Room, polling cho trang người dùng | LOCKED |
+| D0.15 | Một PostgreSQL container, hai database `apexstock_baseline` / `apexstock_optimized`, cùng migration + seed IDs | LOCKED |
 
 ---
 
@@ -41,7 +43,7 @@
 
 | Stage | Tên Stage | Phụ thuộc | Primary Agent | Support Agent(s) | Reviewer | Status | Fix Rounds | Commit SHA |
 |---:|---|---|---|---|---|---|---:|---|
-| **0** | Contract, decision gate & skeleton docs | None | `stages-planner` / `backend-core` | `infra-devops` | `code-reviewer` | `COMPLETED` | 0 | `stage-0` |
+| **0** | Contract, decision gate & skeleton docs | None | `stages-planner` / `backend-core` | `infra-devops` | `code-reviewer` | `COMPLETED` | 0 | `91ce71c` |
 | **1** | Host foundation, Docker Compose & health slice | Stage 0 | `infra-devops` | `backend-core`, `frontend-ui` | `code-reviewer` | `PENDING` | 0 | - |
 | **2** | PostgreSQL migration, Redis keyspace & seed/reset | Stage 1 | `backend-core` | `infra-devops` | `code-reviewer` | `PENDING` | 0 | - |
 | **3** | Baseline order vertical slice | Stage 2 | `backend-core` | - | `code-reviewer` | `PENDING` | 0 | - |

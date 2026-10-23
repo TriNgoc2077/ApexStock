@@ -10,7 +10,7 @@
 
 ## 1. Cách đọc và phạm vi của kế hoạch
 
-Repository hiện mới có tài liệu thiết kế và hồ sơ agent; chưa có `README`, mã nguồn, `go.mod`, `package.json`, Docker Compose hay cấu hình runtime. Vì vậy các đường dẫn trong kế hoạch là **đường dẫn dự kiến** cho implementation, không phải khẳng định rằng file đã tồn tại.
+Repository hiện có tài liệu thiết kế, contract đã chốt (`docs/decisions`, `docs/contracts`, `docs/domain`, `docs/benchmark`), hồ sơ agent, `CLAUDE.md` và `go.mod` (module `apexstock`); chưa có mã nguồn, `package.json`, Docker Compose hay cấu hình runtime. Vì vậy các đường dẫn trong kế hoạch là **đường dẫn dự kiến** cho implementation, không phải khẳng định rằng file đã tồn tại.
 
 Kế hoạch này giữ các quyết định đã nêu trong SDD/spec, nhưng không âm thầm giải quyết các điểm mâu thuẫn. Các điểm có thể làm thay đổi contract hoặc tính đúng đắn được gom vào **Decision Gate D0** và các decision bổ sung trong mục 4. Mọi stage có thể bắt đầu sau D0 chỉ khi contract liên quan đã được ghi lại trong `docs/decisions/` hoặc phần quyết định của SDD.
 
@@ -161,8 +161,9 @@ Hai implementation phải dùng:
 | D0.12 | War Room muốn gọi Docker API/socket; public frontend không được gọi socket trực tiếp. | Rủi ro kill tùy ý và lộ quyền host. | **CHỐT:** Bỏ tính năng kill từ UI, chính operator sẽ kill container trực tiếp trong demo. Browser gọi Go controller localhost-only/auth/allowlist target/action cho các chức năng khác; socket chỉ mount vào controller profile demo nếu cần. | Security review |
 | D0.13 | `maxmemory-policy allkeys-lru` mâu thuẫn với yêu cầu giữ inventory key. | Redis có thể tự xóa stock/idempotency. | **CHỐT:** Cấu hình `noeviction` và không eviction inventory. Alert memory nếu cần. | Redis config review |
 | D0.14 | Frontend route dùng `:id` theo kiểu Express trong khi Next App Router dùng segment `[id]`; realtime stock có WebSocket nhưng contract chưa có endpoint riêng. | Scaffold route/API mismatch. | **CHỐT:** Dùng Next `[id]`; dùng WebSocket cho War Room, các trang người dùng dùng polling đơn giản. | Frontend/API contract |
+| D0.15 | Baseline và Optimized dùng chung `flash_sale_items.sold_quantity` nhưng khác semantics; chạy đồng thời (demo) làm lệch dữ liệu. | Reconciliation sai, demo hai panel hỏng dữ liệu. | **CHỐT:** Một container PostgreSQL, hai database `apexstock_baseline` / `apexstock_optimized`, cùng migration và seed IDs. | `D0-decisions-summary.md`, `benchmark-matrix.yaml` |
 
-**Definition of ready sau D0:** Tất cả D0.1–D0.14 đã được chốt. Có thể triển khai stage 1–13 theo thứ tự dependency.
+**Definition of ready sau D0:** Tất cả D0.1–D0.15 đã được chốt. Có thể triển khai stage 1–13 theo thứ tự dependency.
 
 
 ---
@@ -255,7 +256,7 @@ Tên thư mục có thể thay đổi nếu implementation chọn layout Go khá
 | 12 | Chaos, soak, system & recovery | Fault injection, replay, recovery, resource/long-run | 7, 9, 10, 11 smoke | Có evidence về failure mode và runbook |
 | 13 | Demo hardening & handoff | Freeze config, rehearsal, evidence pack, rollback | 11, 12 | Bộ demo lặp lại được và handoff rõ |
 
-Các stage 6 và 8 có thể triển khai song song sau khi stage 5 cung cấp contract; stage 7 có thể bắt đầu phần instrumentation từ stage 3–4 nhưng chỉ hoàn thiện sau khi flows ổn định. Stage 11 không được bắt đầu trước khi stage 10 pass các concurrency/invariant test nền tảng.
+Các stage được triển khai **tuần tự 1 → 13** bởi một orchestrator duy nhất; Stage X+1 chỉ bắt đầu khi Stage X đã verify và commit. Stage 3–4 có thể thêm instrumentation cơ bản, Stage 7 hoàn thiện observability sau khi flows ổn định. Stage 11 không được bắt đầu trước khi stage 10 pass các concurrency/invariant test nền tảng.
 
 
 ---
@@ -294,7 +295,7 @@ Các stage 6 và 8 có thể triển khai song song sau khi stage 5 cung cấp c
 
 **Files:** `go.mod`, `cmd/*/main.go`, `Dockerfile`, `web/Dockerfile`, `deploy/compose/*.yaml`, `internal/httpapi/health.go`, `internal/config/config.go`
 
-**Acceptance:** Fresh checkout build được; Compose up không cần secret thật; PostgreSQL/Redis/NATS healthcheck pass; readiness chỉ pass khi dependency ready; không expose DB/Redis ra host mặc định; idle RAM được ghi lại và không vượt budget.
+**Acceptance:** Fresh checkout build được; Compose up không cần secret thật; PostgreSQL tạo sẵn hai database `apexstock_baseline`/`apexstock_optimized` (D0.15); PostgreSQL/Redis/NATS healthcheck pass; readiness chỉ pass khi dependency ready; không expose DB/Redis ra host mặc định; idle RAM được ghi lại và không vượt budget.
 
 **Handoff:** Stage 2 dùng service names/URL/endpoints đã khóa, không hardcode localhost trong container.
 
@@ -313,7 +314,7 @@ Các stage 6 và 8 có thể triển khai song song sau khi stage 5 cung cấp c
 
 **Files:** `db/migrations/*.sql`, `internal/persistence/postgres/*.go`, `cmd/migrate-seed/main.go`, `db/seed/*.json`, `scripts/seed/seed.sh`, `scripts/reset/reset.sh`, `test/system/reconcile.sql`
 
-**Acceptance:** Database chạy migration thành công; seed cùng config cho cùng logical IDs; có event active và stock từ DB/Redis; constraints không chứa predicate không hợp lệ; reset đưa cả DB và Redis về baseline; reconciliation pass.
+**Acceptance:** Migration chạy thành công trên cả `apexstock_baseline` và `apexstock_optimized` (D0.15); seed cùng config cho cùng logical IDs ở cả hai database; có event active và stock từ DB/Redis; constraints không chứa predicate không hợp lệ; reset đưa cả DB và Redis về baseline; reconciliation pass.
 
 **Handoff:** Stage 3–4 không tự query các cột ngoài schema contract; seed manifest là input bắt buộc của k6 và reconciliation.
 
@@ -441,9 +442,9 @@ Các stage 6 và 8 có thể triển khai song song sau khi stage 5 cung cấp c
 
 **Files:** `cmd/warroom-controller/main.go`, `internal/warroom/*.go`, `internal/chaos/*.go`, `web/app/war-room/**/*`, tests
 
-**Acceptance:** Idle screen hiển thị Unknown/healthy đúng; start/stop có state machine; live stream reconnect được; mất Prometheus/WS có stale marker; Baseline/Optimized panel phản ánh topology thật; kill API qua controller có audit, target ngoài allowlist bị reject; recovery time đo từ event injection; summary từ run result có run ID; browser performance/accessibility pass.
+**Acceptance:** Idle screen hiển thị Unknown/healthy đúng; start/stop có state machine; live stream reconnect được; mất Prometheus/WS có stale marker; Baseline/Optimized panel phản ánh topology thật; không có endpoint kill/pause container nào (D0.12), operator kill bằng Docker CLI và War Room phát hiện qua health/metrics rồi ghi activity log; recovery time đo từ thời điểm phát hiện container down; summary từ run result có run ID; browser performance/accessibility pass.
 
-**Handoff:** Stage 12 dùng controller inject failure có kiểm soát. Stage 13 dùng runbook và layout đã rehearsal, không sửa metric semantics vì lý do trình bày.
+**Handoff:** Stage 12 inject failure bằng script `scripts/chaos/*.sh` (Docker CLI, allowlist target, có cleanup) do operator chạy, War Room chỉ quan sát. Stage 13 dùng runbook và layout đã rehearsal, không sửa metric semantics vì lý do trình bày.
 
 ---
 
@@ -525,11 +526,11 @@ Các stage 6 và 8 có thể triển khai song song sau khi stage 5 cung cấp c
 - Report chỉ dùng measured values, có confidence/variance/limitation.
 - README one-command và troubleshooting.
 - Review cuối theo code-reviewer checklist.
-- Handoff note trong docs/PR description; không commit theo yêu cầu hiện tại.
+- Handoff note trong `docs/handoff.md`; commit theo quy trình chuẩn của orchestrator.
 
 **Files:** `docs/runbooks/demo-day.md`, `docs/benchmark/results/<run-id>/{summary.json,metadata.json,invariants.txt,README.md}`, `docs/known-limitations.md`, `README.md`, `scripts/demo/*.sh`
 
-**Acceptance:** Người khác đọc README/runbook có thể khởi động, seed, smoke và reset; demo không dùng target/hypothesis như measured result; mọi chart/table có run ID và timestamp; không có secret/socket exposure trong default profile; full rehearsal pass hoặc failure được ghi rõ; working tree không commit ngoài yêu cầu; artifact/generated files có policy.
+**Acceptance:** Người khác đọc README/runbook có thể khởi động, seed, smoke và reset; demo không dùng target/hypothesis như measured result; mọi chart/table có run ID và timestamp; không có secret/socket exposure trong default profile; full rehearsal pass hoặc failure được ghi rõ; working tree sạch sau commit cuối; artifact/generated files có policy.
 
 **Handoff:** Phải gồm D0 decisions và còn mở; cách chạy từng profile; seed/reset/reconcile commands; contract/state/invariant summary; test commands và pass/fail/known flaky; benchmark metadata/artifact locations; failure modes và recovery steps; các phần chưa implement ghi cụ thể.
 

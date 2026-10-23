@@ -1,14 +1,14 @@
 # Decision Gate D0 — Tổng hợp các quyết định đã chốt
 
 > **Ngày:** 2026-10-23  
-> **Trạng thái:** Đã chốt tất cả 14 quyết định  
+> **Trạng thái:** Đã chốt tất cả 15 quyết định  
 > **Người quyết định:** Product Owner/Tech Lead
 
 ---
 
 ## Tổng quan
 
-Decision Gate D0 giải quyết 14 mâu thuẫn/chỗ thiếu contract trong tài liệu thiết kế. Tất cả các quyết định này đã được chốt và phải được tuân thủ trong toàn bộ quá trình triển khai.
+Decision Gate D0 giải quyết 15 mâu thuẫn/chỗ thiếu contract trong tài liệu thiết kế. Tất cả các quyết định này đã được chốt và phải được tuân thủ trong toàn bộ quá trình triển khai.
 
 ---
 
@@ -200,9 +200,23 @@ Decision Gate D0 giải quyết 14 mâu thuẫn/chỗ thiếu contract trong tà
 
 ---
 
+## D0.15 — Cô lập dữ liệu giữa Baseline và Optimized
+
+**Vấn đề:** Hai kiến trúc dùng chung bảng `flash_sale_items` nhưng `sold_quantity` mang hai nghĩa khác nhau (Baseline tăng khi reserve; Optimized chỉ tăng khi paid). Chạy đồng thời trên cùng item (profile `demo`) sẽ làm lệch dữ liệu và reconciliation.
+
+**Quyết định:**
+- Một container PostgreSQL, **hai database riêng**: `apexstock_baseline` và `apexstock_optimized`
+- Cùng bộ migration, cùng seed IDs (`flash_sale_id`, `item_id`, user IDs trong `benchmark-matrix.yaml`)
+- API Baseline chỉ kết nối `apexstock_baseline`; API/worker/scheduler Optimized chỉ kết nối `apexstock_optimized`
+- Reset/seed/reconcile chạy theo từng database; Redis chỉ phục vụ Optimized
+
+**Lý do:** Giữ semantics riêng của từng kiến trúc mà không xung đột, cho phép demo hai panel cùng lúc, không tốn thêm container.
+
+---
+
 ## Definition of Ready
 
-**Tất cả D0.1–D0.14 đã được chốt.** Có thể triển khai stage 1–13 theo thứ tự dependency trong IMPLEMENTATION_PLAN.md.
+**Tất cả D0.1–D0.15 đã được chốt.** Có thể triển khai stage 1–13 theo thứ tự dependency trong IMPLEMENTATION_PLAN.md.
 
 ---
 

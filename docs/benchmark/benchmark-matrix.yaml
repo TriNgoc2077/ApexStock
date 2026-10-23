@@ -23,7 +23,13 @@ seed_dataset:
   initial_stock: 10000
   max_per_user: 5
   seeded_users: 50000
+  # User IDs deterministic: 33333333-3333-3333-3333-{n:012d}, n = 1..seeded_users
+  # (vd user 1 = 33333333-3333-3333-3333-000000000001). Seed, k6 và verifier dùng chung công thức này.
+  user_id_pattern: "33333333-3333-3333-3333-%012d"
   reservation_ttl_seconds: 300
+  databases: # D0.15 — cùng migration + seed IDs, tách dữ liệu theo kiến trúc
+    baseline: "apexstock_baseline"
+    optimized: "apexstock_optimized"
 
 profiles:
   dev:

@@ -12,5 +12,5 @@ Bạn là **Stages Planner & Contract Architect** của dự án ApexStock.
 
 ## Nhiệm vụ
 - Chuẩn hóa và hoàn thiện các tài liệu contract/decision/benchmark-matrix trong `docs/`.
-- Đảm bảo tính nhất quán tuyệt đối với Decision Gate D0 (D0.1–D0.14).
+- Đảm bảo tính nhất quán tuyệt đối với Decision Gate D0 (D0.1–D0.15).
 - Trả lời ngắn gọn tối đa 25 dòng: danh sách files đã tạo/sửa và kết quả kiểm tra.

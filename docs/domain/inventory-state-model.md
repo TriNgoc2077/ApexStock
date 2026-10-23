@@ -10,6 +10,8 @@
 
 Inventory state được tách rõ thành 3 trạng thái để tránh nhầm lẫn giữa Baseline và Optimized, đảm bảo reconciliation chính xác.
 
+Mỗi kiến trúc dùng database riêng (`apexstock_baseline` / `apexstock_optimized`, D0.15), nên cột `sold_quantity` được phép mang semantics khác nhau như mô tả bên dưới mà không xung đột.
+
 ---
 
 ## Ba trạng thái
@@ -115,6 +117,12 @@ redis.call('ZADD', reservation_key, expires_at, reservation_id)
 
 return {ok = 'reserved', new_available = available - quantity}
 ```
+
+> [!IMPORTANT]
+> Script trên **chỉ minh họa luồng**, không copy nguyên vào code. Bản implement phải:
+> - Trả về **mảng** (vd `{1, new_available}` / `{0, 'out_of_stock', available}`) — Redis Lua chuyển table có key dạng string thành mảng rỗng.
+> - Atomic trong cùng script: kiểm tra idempotency/reservation đã tồn tại, kiểm tra `max_per_user`, DECRBY stock, ghi reservation record (hash chứa `reservation_id`, `item_id`, `user_id`, `qty`, `state` — D0.5) và ZADD vào index hết hạn.
+> - Dùng cùng hash tag cho mọi key của một item nếu sau này cần tương thích cluster (hiện tại single-node).
 
 ### Projection
 ```
