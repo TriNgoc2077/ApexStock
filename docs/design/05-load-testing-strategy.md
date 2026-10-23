@@ -437,7 +437,7 @@ random_page_cost = 1.1           # SSD
 
 ```ini
 maxmemory 400mb
-maxmemory-policy allkeys-lru
+maxmemory-policy noeviction      # Không evict inventory keys; alert khi gần giới hạn
 save ""                          # Tắt RDB trong test để giảm I/O
 appendonly no                    # Tắt AOF trong test
 tcp-backlog 511

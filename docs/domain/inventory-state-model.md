@@ -41,14 +41,15 @@ total_quantity = available + reserved + paid
 
 ## Baseline Implementation
 
-### Schema
+### Schema (theo `02-database-and-data.md` — dùng UUID)
 ```sql
 CREATE TABLE flash_sale_items (
-  id BIGSERIAL PRIMARY KEY,
-  flash_sale_id BIGINT REFERENCES flash_sales(id),
-  product_id BIGINT REFERENCES products(id),
-  total_quantity INT NOT NULL,
-  sold_quantity INT NOT NULL DEFAULT 0,  -- tăng ngay khi order
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  flash_sale_id UUID NOT NULL REFERENCES flash_sale_events(id),
+  product_id UUID NOT NULL REFERENCES products(id),
+  sale_price NUMERIC(12, 2) NOT NULL,
+  total_quantity INT NOT NULL CHECK (total_quantity >= 0),
+  sold_quantity INT NOT NULL DEFAULT 0 CHECK (sold_quantity >= 0), -- Baseline: tăng khi reserve, giảm khi release/expired
   max_per_user INT NOT NULL DEFAULT 1
 );
 ```

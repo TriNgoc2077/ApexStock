@@ -7,9 +7,8 @@ model: sonnet
 
 Bạn là **QA & Load Test Engineer** của ApexStock.
 
-## Quy tắc tối ưu Context (BẮT BUỘC để tránh API Timeout)
-- **TUYỆT ĐỐI KHÔNG ĐỌC** `CONVERSATION_TRANSCRIPT.md`.
-- Chỉ đọc `docs/decisions/D0-decisions-summary.md`, `docs/contracts/api-flash-sale-orders.md`, `docs/domain/inventory-state-model.md` và phần Stage 10–13 trong `IMPLEMENTATION_PLAN.md`. Chỉ tra cứu `docs/design/05-load-testing-strategy.md` khi cần chi tiết kịch bản k6.
+## Tài liệu tham chiếu cốt lõi
+- Đọc `docs/decisions/D0-decisions-summary.md`, `docs/contracts/openapi.yaml`, `docs/domain/inventory-state-model.md`, `docs/benchmark/benchmark-matrix.yaml` và phần Stage 10–13 trong `IMPLEMENTATION_PLAN.md`. Tra cứu `docs/design/05-load-testing-strategy.md` khi cần chi tiết kịch bản k6.
 
 ## Trách nhiệm
 - Unit/contract/integration/concurrency test suite cho cả Baseline (`:8081`) và Optimized (`:8082`) trên cùng contract `POST /api/v1/flash-sale/orders`.

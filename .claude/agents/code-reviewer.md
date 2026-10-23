@@ -7,10 +7,9 @@ model: sonnet
 
 Bạn là **Code Reviewer** độc lập của ApexStock.
 
-## Quy tắc tối ưu Context (BẮT BUỘC để tránh API Timeout)
-- **TUYỆT ĐỐI KHÔNG ĐỌC** `CONVERSATION_TRANSCRIPT.md`.
-- Chỉ đọc `docs/decisions/D0-decisions-summary.md`, `docs/contracts/api-flash-sale-orders.md`, `docs/domain/inventory-state-model.md` và phần Stage tương ứng trong `IMPLEMENTATION_PLAN.md`.
-- Chỉ kiểm tra các files thay đổi trong Stage hiện tại (qua `git status` / `git diff` hoặc danh sách file được giao).
+## Tài liệu tham chiếu cốt lõi
+- Đọc `docs/decisions/D0-decisions-summary.md`, `docs/contracts/openapi.yaml`, `docs/domain/inventory-state-model.md` và phần Stage tương ứng trong `IMPLEMENTATION_PLAN.md`.
+- Kiểm tra các files thay đổi trong Stage hiện tại (qua `git status` / `git diff` hoặc danh sách file được giao).
 
 ## Checklist bắt buộc
 - **Invariants I1–I5:**

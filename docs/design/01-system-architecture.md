@@ -1219,15 +1219,15 @@ flowchart TD
 
 | Tiêu chí | Baseline | Optimized | Ghi chú |
 |---|---|---|---|
-| **Throughput (req/s)** | 200 – 500 | 3,000 – 8,000 | Phụ thuộc vào product contention |
-| **Latency p50** | 10 – 30 ms | 2 – 5 ms | Optimized trả 202 ngay, không chờ DB |
-| **Latency p95** | 80 – 200 ms | 5 – 15 ms | |
-| **Latency p99** | 200 – 1,000 ms | 10 – 30 ms | Baseline tệ nhất khi lock contention cao |
+| **Throughput (req/s)** | Hypothesis: 200–500 | Hypothesis: 3.000–8.000 | Phụ thuộc vào product contention; cần benchmark xác minh |
+| **Latency p50** | Hypothesis: 10–30 ms | Hypothesis: 2–5 ms | Optimized trả 201 ngay sau NATS JetStream ack (persistent) |
+| **Latency p95** | Hypothesis: 80–200 ms | Hypothesis: 5–15 ms | |
+| **Latency p99** | Hypothesis: 200–1.000 ms | Hypothesis: 10–30 ms | Baseline tệ nhất khi lock contention cao |
 | **Overselling risk** | Thấp (DB lock) | Rất thấp (Redis atomic) | Cả hai đều an toàn, nhưng Redis nhanh hơn |
-| **Fault tolerance** | Thấp (SPOF) | Cao (multi-instance, queue buffer) | |
+| **Fault tolerance** | Thấp (SPOF) | Cao (multi-instance, NATS JetStream buffer) | |
 | **Data consistency** | Strong (synchronous) | Eventual (async processing) | Optimized: đơn hàng "pending" → "confirmed" sau ~50-200ms |
 | **Complexity** | ⭐ Đơn giản | ⭐⭐⭐⭐ Phức tạp | Nhiều component, nhiều failure mode |
-| **Lines of code (est.)** | ~2,000 LOC | ~6,000 LOC | Bao gồm Lua scripts, workers, circuit breakers |
+| **Lines of code (est.)** | ~2.000 LOC | ~6.000 LOC | Bao gồm Lua scripts, workers, circuit breakers |
 | **RAM usage** | ~800 MB | ~4.5 GB | Nhiều container hơn |
 | **CPU usage (idle)** | ~0.5 cores | ~1.5 cores | |
 | **CPU usage (peak)** | ~2 cores | ~8 cores | Tận dụng tốt hơn phần cứng đa nhân |
@@ -1251,14 +1251,14 @@ flowchart TD
 | Thời gian bán 1000 items | ~3-5 giây | 1000 VUs đồng thời |
 | Overselling | 0 items | Hard requirement |
 
-#### Optimized Targets
+#### Optimized Targets (Hypothesis)
 
-| Metric | Target | Điều kiện |
+| Metric | Target Hypothesis | Điều kiện |
 |---|---|---|
-| Max throughput | 3,000 – 5,000 req/s | 1 sản phẩm, 5000 VUs |
-| p50 latency | < 5 ms | API response (202 Accepted) |
+| Max throughput | 3.000–5.000 req/s | 1 sản phẩm, 5000 VUs; cần benchmark xác minh |
+| p50 latency | < 5 ms | API response (201 Created) |
 | p99 latency | < 20 ms | API response |
-| Error rate | < 0.5% | Không tính 409/429 |
+| Error rate | < 0.5% | Không tính 409/422 (business logic) |
 | Thời gian bán 1000 items | ~0.5-1 giây | 5000 VUs đồng thời |
 | Order processing time (end-to-end) | < 500 ms | Từ request → confirmed |
 | Overselling | 0 items | Hard requirement |
@@ -1303,7 +1303,7 @@ flowchart LR
 ```
 
 > [!IMPORTANT]
-> **Mục tiêu của ApexStock không phải chứng minh "Optimized tốt hơn Baseline" — mà là đo lường chính xác trade-off giữa complexity và performance.** War Room dashboard sẽ hiển thị hai kiến trúc chạy song song, cùng workload, cùng phần cứng, để người xem tự đánh giá khi nào cần nâng cấp kiến trúc.
+> **Mục tiêu của ApexStock không phải chứng minh "Optimized tốt hơn Baseline" — mà là đo lường chính xác trade-off giữa complexity và performance.** War Room dashboard sẽ hiển thị hai kiến trúc với benchmark chạy tuần tự, cùng workload, cùng phần cứng, để người xem tự đánh giá khi nào cần nâng cấp kiến trúc.
 
 ---
 

@@ -7,9 +7,8 @@ model: sonnet
 
 Bạn là **Frontend UI Engineer** của ApexStock.
 
-## Quy tắc tối ưu Context (BẮT BUỘC để tránh API Timeout)
-- **TUYỆT ĐỐI KHÔNG ĐỌC** `CONVERSATION_TRANSCRIPT.md`.
-- Chỉ đọc `docs/decisions/D0-decisions-summary.md`, `docs/contracts/api-flash-sale-orders.md` và phần Stage 8 / Stage 9 trong `IMPLEMENTATION_PLAN.md`. Chỉ tra cứu `docs/design/04-war-room-dashboard.md` khi cần chi tiết War Room.
+## Tài liệu tham chiếu cốt lõi
+- Đọc `docs/decisions/D0-decisions-summary.md`, `docs/contracts/openapi.yaml` và phần Stage 8 / Stage 9 trong `IMPLEMENTATION_PLAN.md`. Tra cứu `docs/design/04-war-room-dashboard.md` khi cần chi tiết War Room.
 
 ## Trách nhiệm & Nguyên tắc
 - Next.js App Router (`[id]` segment theo D0.14), TypeScript, Tailwind CSS, Framer Motion.

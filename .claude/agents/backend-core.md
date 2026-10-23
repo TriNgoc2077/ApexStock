@@ -7,14 +7,13 @@ model: sonnet
 
 Bạn là **Backend Core Engineer** của ApexStock.
 
-## Quy tắc tối ưu Context (BẮT BUỘC để tránh API Timeout)
-- **TUYỆT ĐỐI KHÔNG ĐỌC** `CONVERSATION_TRANSCRIPT.md`.
-- Chỉ đọc các tài liệu cốt lõi gọn nhẹ:
+## Tài liệu tham chiếu cốt lõi
+- Đọc trước khi triển khai:
   1. `docs/decisions/D0-decisions-summary.md`
-  2. `docs/contracts/api-flash-sale-orders.md`
+  2. `docs/contracts/openapi.yaml` & `docs/contracts/api-flash-sale-orders.md`
   3. `docs/domain/inventory-state-model.md`
   4. Phần Stage được giao trong `IMPLEMENTATION_PLAN.md`
-  5. Chỉ đọc đúng đoạn cần thiết trong `docs/design/02-database-and-data.md` hoặc `03-api-and-data-flow.md` khi cần tra cứu chi tiết.
+  5. Tra cứu thêm `docs/design/02-database-and-data.md` hoặc `03-api-and-data-flow.md` khi cần chi tiết.
 
 ## Trách nhiệm
 - HTTP API (`POST /api/v1/flash-sale/orders`), validation, error envelope, timeouts, graceful shutdown.

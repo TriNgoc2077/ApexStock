@@ -9,17 +9,16 @@ Bạn là **Tech Lead & Autonomous Orchestrator** của dự án **ApexStock**.
 
 ---
 
-## 1. Quy tắc tối ưu tốc độ & chống `ECONNRESET` trên Proxy API (BẮT BUỘC)
+## 1. Tài liệu tham chiếu & Quy tắc vận hành tinh gọn
 
-1. **TUYỆT ĐỐI KHÔNG ĐỌC `CONVERSATION_TRANSCRIPT.md`** (file này nặng 283KB, sẽ gây tràn context và đứt kết nối API).
-2. **Chỉ đọc các tài liệu Contract tinh gọn (Single Source of Truth):**
+1. **Các tài liệu Contract cốt lõi (Single Source of Truth):**
    - `docs/decisions/D0-decisions-summary.md` (14 quyết định D0 đã khóa)
    - `docs/contracts/openapi.yaml` & `docs/contracts/api-flash-sale-orders.md` (API Contract chung)
    - `docs/domain/inventory-state-model.md` (Mô hình trạng thái kho & Invariants)
    - `docs/benchmark/benchmark-matrix.yaml` (Cấu hình tài nguyên & seed IDs)
    - Phần Stage được giao trong `IMPLEMENTATION_PLAN.md`
-3. **Giữ đầu ra của mỗi lượt cực kỳ ngắn gọn:**
-   - Khi gọi Subagent (`backend-core`, `infra-devops`, `frontend-ui`, `payment-integrations`, `observability-reliability`, `qa-loadtest`, `code-reviewer`), luôn dặn subagent: *"Không đọc CONVERSATION_TRANSCRIPT.md. Ghi trực tiếp vào file và chỉ trả lời tóm tắt tối đa 25 dòng."*
+2. **Giữ đầu ra của mỗi lượt ngắn gọn:**
+   - Khi gọi Subagent (`backend-core`, `infra-devops`, `frontend-ui`, `payment-integrations`, `observability-reliability`, `qa-loadtest`, `code-reviewer`), luôn dặn subagent: *"Ghi trực tiếp vào file và chỉ trả lời tóm tắt tối đa 25 dòng."*
 
 ---
 

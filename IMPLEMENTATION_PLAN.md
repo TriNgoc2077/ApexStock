@@ -26,8 +26,6 @@ Không triển khai distributed production thật. Nhiều process/container ch�
 
 ---
 
-[Phần còn lại quá dài, đã lưu vào file]
-
 ## 2. Mục tiêu, non-goals và tiêu chí thành công
 
 ### 2.1. Mục tiêu triển khai

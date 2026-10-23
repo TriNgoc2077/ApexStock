@@ -328,7 +328,7 @@ Worker → UPDATE order status=expired → Lua release_stock → stock tăng l�
 
 ### 6.3 Idempotency race condition
 
-Khi 2 request cùng key đến đồng thời: Redis `SET NX` đảm bảo chỉ 1 request thắng. Request thua nhận 409 Conflict với thông tin về request đang xử lý.
+Khi 2 request cùng key đến đồng thời: Redis `SET NX` đảm bảo chỉ 1 request thắng. Request thua nhận 409 Conflict với request_id để client theo dõi.
 
 ---
 
@@ -545,5 +545,5 @@ Mở browser, giải thích layout 50/50, các panel metrics.
 | [`01-system-architecture.md`](./01-system-architecture.md) | Kiến trúc chi tiết, patterns, Docker Compose |
 | [`02-database-and-data.md`](./02-database-and-data.md) | Schema, Lua scripts, Redis keys, NATS topics |
 | [`03-api-and-data-flow.md`](./03-api-and-data-flow.md) | API endpoints, sequence diagrams |
-| [`04-war-room-dashboard.md`](./04-war-room-dashboard.md) | Layout, chaos controls, animation |
+| [`04-war-room-dashboard.md`](./04-war-room-dashboard.md) | Layout, real-time metrics, animation |
 | [`05-load-testing-strategy.md`](./05-load-testing-strategy.md) | k6 scripts, metrics, benchmark methodology |

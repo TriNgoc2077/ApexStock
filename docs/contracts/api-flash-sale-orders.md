@@ -1,112 +1,113 @@
 # API Contract — Flash Sale Orders
 
-> **Phiên bản:** 1.0  
+> **Phiên bản:** 1.1 (Đồng bộ UUID theo `02-database-and-data.md` & `benchmark-matrix.yaml`)  
 > **Ngày:** 2026-10-23  
-> **Quyết định liên quan:** D0.1, D0.2, D0.3, D0.4
+> **Quyết định liên quan:** D0.1, D0.2, D0.3, D0.4, D0.6, D0.7
 
 ---
 
-## Tổng quan
+## 1. Endpoint chung (D0.2)
 
-Baseline và Optimized dùng **chung 1 endpoint và schema** để đảm bảo tính công bằng trong benchmark.
-
----
-
-## Endpoint chung
-
-```
+```http
 POST /api/v1/flash-sale/orders
 ```
 
 **Phân tách port:**
-- **Baseline:** `:8081`
-- **Optimized:** `:8082`
+- **Baseline:** `:8081` (`http://localhost:8081`)
+- **Optimized:** `:8082` (`http://localhost:8082`)
 
-k6 và frontend sử dụng base URL khác nhau để chọn implementation.
+k6 và frontend sử dụng base URL khác nhau để chọn implementation nhưng gửi cùng một request schema.
 
 ---
 
-## Request Schema
+## 2. Request Schema
 
+**Headers hỗ trợ:**
+- `Idempotency-Key: <string>` (có thể truyền qua header hoặc trường `idempotency_key` trong body; nếu truyền cả hai thì phải khớp nhau)
+- `X-User-ID: <uuid>` hoặc `Authorization: Bearer <jwt>` (hoặc truyền `user_id` trong body khi chạy k6 benchmark)
+- `X-Correlation-ID: <string>` (tùy chọn; nếu thiếu server tự sinh UUID)
+
+**JSON Body:**
 ```json
 {
-  "flash_sale_item_id": 123,
+  "user_id": "33333333-3333-3333-3333-000000000001",
+  "flash_sale_item_id": "22222222-2222-2222-2222-222222222222",
   "quantity": 1,
-  "idempotency_key": "user123_item456_20261023T120000"
+  "idempotency_key": "usr_1_item_2222_attempt_1"
 }
 ```
 
-**Validation:**
-- `flash_sale_item_id`: required, integer > 0
-- `quantity`: required, **phải bằng 1** (D0.4 — mỗi order chỉ mua 1 sản phẩm)
-- `idempotency_key`: required, string, max 255 chars
-
-**Idempotency:**
-- Cùng key + cùng payload → trả cùng response (201 hoặc 409)
-- Cùng key + khác payload → 409 Conflict với error khác biệt
-- TTL: 24h
+**Validation Rules (cả Baseline và Optimized kiểm tra giống hệt nhau):**
+- `user_id`: required (từ body, `X-User-ID` header hoặc JWT claim), định dạng UUID hợp lệ.
+- `flash_sale_item_id`: required, định dạng UUID hợp lệ (hỗ trợ alias `item_id` để tương thích ngược).
+- `quantity`: required, **bắt buộc bằng `1`** (D0.4 — nếu `quantity != 1` trả về `400 Bad Request` với `error: "validation_error"`).
+- `idempotency_key`: required (từ header `Idempotency-Key` hoặc body `idempotency_key`), string độ dài `1..255`.
 
 ---
 
-## Response — Success
-
-**Status:** `201 Created` (D0.1)
+## 3. Response — Success (`201 Created` theo D0.1)
 
 ```json
 {
-  "order_id": 789,
+  "order_id": "99999999-9999-4999-8999-000000000001",
+  "reservation_id": "88888888-8888-4888-8888-000000000001",
+  "user_id": "33333333-3333-3333-3333-000000000001",
+  "flash_sale_item_id": "22222222-2222-2222-2222-222222222222",
+  "quantity": 1,
+  "total_amount": 19990000,
   "status": "pending_payment",
-  "payment": {
-    "payment_id": 101,
-    "status": "pending",
-    "amount": 100000,
-    "expires_at": "2026-10-23T12:15:00Z",
-    "qr_code_url": null,
-    "payment_url": null
-  },
-  "reserved_quantity": 1,
-  "reserved_until": "2026-10-23T12:15:00Z"
+  "payment_status": "pending",
+  "expires_at": "2026-10-23T12:15:00Z",
+  "created_at": "2026-10-23T12:10:00Z",
+  "idempotent": false
 }
 ```
-
-**Durability (D0.1):**
-- Optimized sử dụng **NATS JetStream (persistent on disk)**
-- Order không bị mất khi crash
-- Thanh toán ngay lập tức (không async 202)
+*(Nếu là request retry cùng `idempotency_key` + cùng payload đã thành công trước đó: trả về `201 Created` hoặc `200 OK` cùng payload đơn hàng với `"idempotent": true`).*
 
 ---
 
-## Response — Errors
+## 4. Response — Errors (Chuẩn hóa cho k6 & Frontend)
 
-### 409 Conflict — Out of Stock
+### `400 Bad Request` — Validation Error (`quantity != 1`, thiếu trường, sai UUID)
+```json
+{
+  "error": "validation_error",
+  "message": "Dữ liệu không hợp lệ: quantity phải bằng 1",
+  "details": {
+    "field": "quantity"
+  }
+}
+```
 
+### `404 Not Found` — Không tìm thấy Flash Sale Item
+```json
+{
+  "error": "item_not_found",
+  "message": "Không tìm thấy sản phẩm flash sale"
+}
+```
+
+### `409 Conflict` — Hết hàng (`out_of_stock`)
 ```json
 {
   "error": "out_of_stock",
   "message": "Sản phẩm đã hết hàng",
   "details": {
-    "flash_sale_item_id": 123,
+    "flash_sale_item_id": "22222222-2222-2222-2222-222222222222",
     "available": 0
   }
 }
 ```
 
-### 409 Conflict — Max Per User Reached
-
+### `409 Conflict` — Vượt giới hạn mua mỗi người (`max_per_user_reached`)
 ```json
 {
   "error": "max_per_user_reached",
-  "message": "Bạn đã đạt giới hạn mua cho sản phẩm này",
-  "details": {
-    "flash_sale_item_id": 123,
-    "max_per_user": 2,
-    "user_purchased": 2
-  }
+  "message": "Bạn đã đạt giới hạn mua cho sản phẩm này"
 }
 ```
 
-### 409 Conflict — Idempotency Mismatch
-
+### `409 Conflict` — Idempotency Key trùng nhưng khác Payload (`idempotency_conflict`)
 ```json
 {
   "error": "idempotency_conflict",
@@ -114,112 +115,27 @@ k6 và frontend sử dụng base URL khác nhau để chọn implementation.
 }
 ```
 
-### 429 Too Many Requests
+### `409 Conflict` — Request cùng Key đang được xử lý đồng thời (`request_in_progress`)
+```json
+{
+  "error": "request_in_progress",
+  "message": "Request với cùng idempotency key đang được xử lý"
+}
+```
 
+### `429 Too Many Requests` — Rate Limit
 ```json
 {
   "error": "rate_limit_exceeded",
   "message": "Quá nhiều request, vui lòng thử lại sau",
-  "retry_after": 5
+  "retry_after": 1
 }
 ```
 
-### 400 Bad Request
-
+### `503 Service Unavailable` / `500 Internal Server Error`
 ```json
 {
-  "error": "validation_error",
-  "message": "Dữ liệu không hợp lệ",
-  "details": {
-    "quantity": "quantity phải bằng 1"
-  }
+  "error": "service_unavailable",
+  "message": "Hệ thống tạm thời gián đoạn, vui lòng thử lại"
 }
 ```
-
-### 5xx Server Error
-
-```json
-{
-  "error": "internal_server_error",
-  "message": "Lỗi hệ thống, vui lòng thử lại"
-}
-```
-
----
-
-## Inventory State Model (D0.3)
-
-Tách rõ 3 state:
-
-1. **`available`** — Số lượng còn lại có thể reserve
-2. **`reserved`** — Đã reserve, chờ thanh toán
-3. **`paid`** — Đã thanh toán thành công
-
-**Công thức:**
-```
-total_quantity = available + reserved + paid
-```
-
-**Baseline:**
-- Trừ trực tiếp DB khi order thành công
-- `sold_quantity` tăng ngay
-
-**Optimized:**
-- Reserve trong Redis
-- `sold_quantity` DB chỉ tăng khi paid
-- Worker đồng bộ từ NATS
-
----
-
-## Performance Targets (D0.1)
-
-- `<5ms` response time là **hypothesis**, không phải acceptance criteria
-- Sẽ được đo trong benchmark thực tế
-- Report chỉ dùng measured values
-
----
-
-## Validation Rules
-
-Cả Baseline và Optimized validate như nhau:
-
-- Flash sale phải đang active (`start_time <= now() < end_time`)
-- User đã authenticate (JWT valid)
-- `quantity` phải bằng 1
-- `max_per_user` không vượt quá
-- Stock available đủ
-
----
-
-## Single Item Constraint (D0.4)
-
-**Quy tắc:**
-- Mỗi order flash sale chỉ được mua **đúng 1 sản phẩm**
-- Nếu `quantity != 1` → 400 Bad Request
-- Multi-item order nằm ngoài phạm vi hiện tại
-- Có thể mở rộng trong tương lai (giỏ hàng nhiều món bình thường + 1 món flash sale)
-
-**Lý do:**
-- Đơn giản hóa Lua transaction (all-or-nothing)
-- Tránh reserve dở dang
-- Phù hợp scope demo
-
----
-
-## Testing
-
-**Contract tests phải cover:**
-- Happy path → 201
-- Out of stock → 409
-- Max per user → 409
-- Idempotency same payload → 201 same response
-- Idempotency different payload → 409
-- Invalid quantity (!=1) → 400
-- Rate limit → 429
-- Concurrent same item → no oversell
-- Concurrent same key → đúng 1 order
-
----
-
-**Người maintain:** Backend Team  
-**Review:** Tech Lead, QA

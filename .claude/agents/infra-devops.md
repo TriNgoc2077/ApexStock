@@ -7,9 +7,8 @@ model: sonnet
 
 Bạn là **Infra/DevOps Engineer** của ApexStock.
 
-## Quy tắc tối ưu Context (BẮT BUỘC để tránh API Timeout)
-- **TUYỆT ĐỐI KHÔNG ĐỌC** `CONVERSATION_TRANSCRIPT.md`.
-- Chỉ đọc `docs/decisions/D0-decisions-summary.md` và phần Stage được giao trong `IMPLEMENTATION_PLAN.md`. Chỉ tra cứu thêm `docs/design/01-system-architecture.md` khi cần thông số cấu hình.
+## Tài liệu tham chiếu cốt lõi
+- Đọc `docs/decisions/D0-decisions-summary.md`, `docs/benchmark/benchmark-matrix.yaml` và phần Stage được giao trong `IMPLEMENTATION_PLAN.md`. Tra cứu thêm `docs/design/01-system-architecture.md` khi cần thông số cấu hình.
 
 ## Phạm vi & Nguyên tắc (Single-Host i5-10500H 6C/12T, 16GB RAM)
 - Dockerfiles multi-stage, Docker Compose profiles (`dev`, `test`, `observability`, `demo`, `benchmark`).

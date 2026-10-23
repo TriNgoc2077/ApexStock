@@ -15,16 +15,16 @@ export API_TIMEOUT_MS=300000
 
 case "$LANE" in
   1)
-    PROMPT="Bạn phụ trách LANE 1. Đọc ledgers/LANE_1_INFRA.md, docs/decisions/D0-decisions-summary.md, docs/contracts/openapi.yaml, docs/domain/inventory-state-model.md, docs/benchmark/benchmark-matrix.yaml và tự động triển khai liên tục Stage 1 -> Stage 2 -> Stage 7 theo đúng chu trình trong orchestrator.md. TUYỆT ĐỐI KHÔNG đọc CONVERSATION_TRANSCRIPT.md. Chỉ sửa các đường dẫn thuộc sở hữu của LANE 1 và dùng ./scripts/safe-commit.sh để commit sau mỗi stage. Không dừng hỏi tôi giữa các stage."
+    PROMPT="Bạn phụ trách LANE 1. Đọc ledgers/LANE_1_INFRA.md, docs/decisions/D0-decisions-summary.md, docs/contracts/openapi.yaml, docs/domain/inventory-state-model.md, docs/benchmark/benchmark-matrix.yaml và tự động triển khai liên tục Stage 1 -> Stage 2 -> Stage 7 theo đúng chu trình trong orchestrator.md. Chỉ sửa các đường dẫn thuộc sở hữu của LANE 1 và dùng ./scripts/safe-commit.sh để commit sau mỗi stage. Không dừng hỏi tôi giữa các stage."
     ;;
   2)
-    PROMPT="Bạn phụ trách LANE 2. Đọc ledgers/LANE_2_BACKEND.md, docs/decisions/D0-decisions-summary.md, docs/contracts/openapi.yaml, docs/domain/inventory-state-model.md và tự động triển khai liên tục Stage 3 -> Stage 4 -> Stage 5 -> Stage 6 theo đúng chu trình trong orchestrator.md. TUYỆT ĐỐI KHÔNG đọc CONVERSATION_TRANSCRIPT.md. Chỉ sửa các đường dẫn thuộc sở hữu của LANE 2 và dùng ./scripts/safe-commit.sh để commit sau mỗi stage. Không dừng hỏi tôi giữa các stage."
+    PROMPT="Bạn phụ trách LANE 2. Đọc ledgers/LANE_2_BACKEND.md, docs/decisions/D0-decisions-summary.md, docs/contracts/openapi.yaml, docs/domain/inventory-state-model.md và tự động triển khai liên tục Stage 3 -> Stage 4 -> Stage 5 -> Stage 6 theo đúng chu trình trong orchestrator.md. Chỉ sửa các đường dẫn thuộc sở hữu của LANE 2 và dùng ./scripts/safe-commit.sh để commit sau mỗi stage. Không dừng hỏi tôi giữa các stage."
     ;;
   3)
-    PROMPT="Bạn phụ trách LANE 3. Đọc ledgers/LANE_3_FRONTEND.md, docs/decisions/D0-decisions-summary.md, docs/contracts/openapi.yaml, docs/domain/inventory-state-model.md và tự động triển khai liên tục Stage 8 -> Stage 9 theo đúng chu trình trong orchestrator.md. TUYỆT ĐỐI KHÔNG đọc CONVERSATION_TRANSCRIPT.md. Chỉ sửa các đường dẫn thuộc sở hữu của LANE 3 và dùng ./scripts/safe-commit.sh để commit sau mỗi stage. Không dừng hỏi tôi giữa các stage."
+    PROMPT="Bạn phụ trách LANE 3. Đọc ledgers/LANE_3_FRONTEND.md, docs/decisions/D0-decisions-summary.md, docs/contracts/openapi.yaml, docs/domain/inventory-state-model.md và tự động triển khai liên tục Stage 8 -> Stage 9 theo đúng chu trình trong orchestrator.md. Chỉ sửa các đường dẫn thuộc sở hữu của LANE 3 và dùng ./scripts/safe-commit.sh để commit sau mỗi stage. Không dừng hỏi tôi giữa các stage."
     ;;
   4)
-    PROMPT="Bạn phụ trách LANE 4. Đọc ledgers/LANE_4_QA.md, docs/decisions/D0-decisions-summary.md, docs/contracts/openapi.yaml, docs/domain/inventory-state-model.md, docs/benchmark/benchmark-matrix.yaml và tự động triển khai liên tục Stage 10 -> Stage 11 -> Stage 12 -> Stage 13 theo đúng chu trình trong orchestrator.md. TUYỆT ĐỐI KHÔNG đọc CONVERSATION_TRANSCRIPT.md. Chỉ sửa các đường dẫn thuộc sở hữu của LANE 4 và dùng ./scripts/safe-commit.sh để commit sau mỗi stage. Không dừng hỏi tôi giữa các stage."
+    PROMPT="Bạn phụ trách LANE 4. Đọc ledgers/LANE_4_QA.md, docs/decisions/D0-decisions-summary.md, docs/contracts/openapi.yaml, docs/domain/inventory-state-model.md, docs/benchmark/benchmark-matrix.yaml và tự động triển khai liên tục Stage 10 -> Stage 11 -> Stage 12 -> Stage 13 theo đúng chu trình trong orchestrator.md. Chỉ sửa các đường dẫn thuộc sở hữu của LANE 4 và dùng ./scripts/safe-commit.sh để commit sau mỗi stage. Không dừng hỏi tôi giữa các stage."
     ;;
   *)
     echo "Cách dùng: ./scripts/run-lane.sh <1|2|3|4>"

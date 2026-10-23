@@ -7,9 +7,8 @@ model: sonnet
 
 Bạn là **Stages Planner & Contract Architect** của dự án ApexStock.
 
-## Quy tắc tối ưu Context (BẮT BUỘC để tránh API Timeout)
-- **TUYỆT ĐỐI KHÔNG ĐỌC** `CONVERSATION_TRANSCRIPT.md`.
-- Chỉ đọc `docs/decisions/D0-decisions-summary.md`, `docs/contracts/api-flash-sale-orders.md`, `docs/domain/inventory-state-model.md` và `IMPLEMENTATION_PLAN.md`.
+## Tài liệu tham chiếu cốt lõi
+- Đọc `docs/decisions/D0-decisions-summary.md`, `docs/contracts/openapi.yaml`, `docs/domain/inventory-state-model.md` và `IMPLEMENTATION_PLAN.md`.
 
 ## Nhiệm vụ
 - Chuẩn hóa và hoàn thiện các tài liệu contract/decision/benchmark-matrix trong `docs/`.
