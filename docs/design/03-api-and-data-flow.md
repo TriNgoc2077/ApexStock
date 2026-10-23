@@ -10,20 +10,20 @@
 
 | Method | Path | Mô tả |
 |--------|------|--------|
-| POST | `/api/v1/flash-sale/order` | Đặt đơn flash sale (kiểm thử tải) |
+| POST | `/api/v1/flash-sale/orders` | Đặt đơn flash sale (Baseline và Optimized dùng chung contract) |
 | GET | `/api/v1/flash-sale/events/:id` | Lấy thông tin sự kiện + tồn kho thực từ Redis |
 | GET | `/api/v1/health` | Health check |
 
-#### POST `/api/v1/flash-sale/order`
+#### POST `/api/v1/flash-sale/orders`
 
-**Request:**
+> Baseline chạy trên `:8081`, Optimized chạy trên `:8082`. Hai bên dùng chung schema và validation để benchmark công bằng.
+
+**Request (mỗi order đúng 1 sản phẩm):**
 ```json
 {
   "idempotency_key": "usr_42_item_7_ts_1792664379",
-  "user_id": "usr_42",
-  "items": [
-    { "flash_sale_item_id": "fsi_7", "quantity": 1 }
-  ]
+  "flash_sale_item_id": "fsi_7",
+  "quantity": 1
 }
 ```
 
@@ -47,7 +47,7 @@
 { "error": "rate_limited", "retry_after": 1 }
 ```
 
-**Response 200 (idempotent – đơn đã tồn tại):**
+**Response 201 (idempotent – đơn đã tồn tại):**
 ```json
 {
   "order_id": "ord_8f3a",
@@ -155,10 +155,11 @@
 
 ### 1.3 War Room APIs
 
+> Benchmark chạy tuần tự từng architecture. War Room dùng WebSocket cho live metrics. **Không có tính năng kill container từ UI**; operator kill container trực tiếp trong demo. Các trang người dùng dùng polling đơn giản.
+
 | Method | Path | Mô tả |
 |--------|------|--------|
 | GET | `/api/v1/warroom/metrics` | Snapshot metrics cả 2 kiến trúc |
-| POST | `/api/v1/warroom/chaos/:action` | Kích hoạt chaos (kill, pause, resume) |
 | GET | `/api/v1/warroom/health` | Trạng thái tất cả container |
 | WS | `/api/v1/warroom/live` | Stream metrics realtime qua WebSocket |
 
@@ -212,14 +213,14 @@ sequenceDiagram
     participant W as Worker
     participant DB as PostgreSQL
 
-    C->>LB: POST /flash-sale/order {idempotency_key, user_id, items}
+    C->>LB: POST /api/v1/flash-sale/orders {idempotency_key, flash_sale_item_id, quantity}
     LB->>API: Forward request (round-robin)
 
     Note over API: 1. Kiểm tra idempotency
     API->>RC: GET idempotency:{key}
     alt Đã tồn tại
         RC-->>API: {status, response}
-        API-->>C: 200 OK (cached response, idempotent:true)
+        API-->>C: 201 Created (cached response, idempotent:true)
     end
 
     Note over API: 2. Rate limiting
@@ -245,8 +246,8 @@ sequenceDiagram
     API->>RC: SET idempotency:{key} {pending} NX PX 86400000
 
     Note over API: 5. Publish message
-    API->>Q: PUBLISH orders.created {order_id, user_id, items, reserved_at}
-    Q-->>API: ack
+    API->>Q: PUBLISH orders.created {order_id, user_id, flash_sale_item_id, quantity, reserved_at}
+    Q-->>API: durable JetStream ack
 
     API-->>C: 201 Created {order_id, status:pending_payment, expires_at}
 

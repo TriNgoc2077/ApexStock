@@ -1,0 +1,74 @@
+# SDD Ledger — Plan: IMPLEMENTATION_PLAN.md
+
+> **Mục đích:** Bộ nhớ trạng thái bền vững trên đĩa (Single Source of Truth) giúp Orchestrator và các Subagents không bị mất trạng thái khi Claude Code tự động nén ngữ cảnh (`/compact`) hoặc khởi động lại phiên.
+> **Quy tắc bắt buộc:** Đọc file này đầu tiên trước mọi hành động và cập nhật ngay sau mỗi bước chuyển trạng thái (State Transition).
+
+---
+
+## 1. Trạng thái thực thi hiện tại (Current Execution State)
+
+- **Overall Status:** `READY`
+- **Current Stage:** `Stage 0`
+- **Current Phase:** `PRE_FLIGHT` (`PRE_FLIGHT` | `IMPLEMENT` | `REVIEW_ROUND_1` | `REVIEW_ROUND_2` | `REVIEW_ROUND_3` | `VERIFY` | `COMMITTED`)
+- **Base Commit SHA:** `b1eebb0`
+- **Last Completed Stage:** `NONE`
+- **Last Completed Commit SHA:** `b1eebb0`
+
+---
+
+## 2. Decision Gate D0 Checklist (Đã chốt trong `IMPLEMENTATION_PLAN.md` Mục 4)
+
+| ID | Nội dung cốt lõi đã khóa | Trạng thái |
+|---|---|---|
+| D0.1 | API trả `201 Created`, dùng NATS JetStream persistent; `<5ms` là target hypothesis | LOCKED |
+| D0.2 | Chung endpoint `POST /api/v1/flash-sale/orders`, cùng schema; Baseline `:8081`, Optimized `:8082` | LOCKED |
+| D0.3 | Tách rõ `available`, `reserved`, `paid`; công thức reconciliation chuẩn hóa cho cả 2 bên | LOCKED |
+| D0.4 | Mỗi order flash sale chỉ mua đúng 1 sản phẩm (`single-item order`) | LOCKED |
+| D0.5 | Reservation record lưu đủ `reservation_id`, `item_id`, `user_id`, `qty`, `state` | LOCKED |
+| D0.6 | Ưu tiên Payment Simulator trước; SePay adapter cô lập provider-specific verification | LOCKED |
+| D0.7 | Late payment sau `expired` giữ nguyên `expired`, ghi `webhook_logs` trạng thái `refund` | LOCKED |
+| D0.8 | Index thường trên `idempotency_keys(expires_at)`, không dùng `now()` trong partial index predicate | LOCKED |
+| D0.9 | Khóa budget CPU/RAM, chạy benchmark tuần tự từng kiến trúc; tách profile `dev`/`demo`/`benchmark` | LOCKED |
+| D0.10 | Mọi con số RPS/latency trong tài liệu là hypothesis cho đến khi có raw benchmark measurement | LOCKED |
+| D0.11 | Benchmark chính thức chạy tuần tự; chạy song song chỉ phục vụ visual demo và phải gắn nhãn | LOCKED |
+| D0.12 | Không gọi Docker socket từ browser; điều khiển qua Go controller localhost-only có allowlist | LOCKED |
+| D0.13 | Redis cấu hình `noeviction` cho inventory/idempotency keyspace | LOCKED |
+| D0.14 | Next.js App Router dùng `[id]`; WebSocket cho War Room, polling cho trang người dùng | LOCKED |
+
+---
+
+## 3. Bảng theo dõi tiến độ từng Stage (Stage Progress Matrix)
+
+| Stage | Tên Stage | Phụ thuộc | Primary Agent | Support Agent(s) | Reviewer | Status | Fix Rounds | Commit SHA |
+|---:|---|---|---|---|---|---|---:|---|
+| **0** | Contract, decision gate & skeleton docs | None | `stages-planner` / `backend-core` | `infra-devops` | `code-reviewer` | `PENDING` | 0 | - |
+| **1** | Host foundation, Docker Compose & health slice | Stage 0 | `infra-devops` | `backend-core`, `frontend-ui` | `code-reviewer` | `PENDING` | 0 | - |
+| **2** | PostgreSQL migration, Redis keyspace & seed/reset | Stage 1 | `backend-core` | `infra-devops` | `code-reviewer` | `PENDING` | 0 | - |
+| **3** | Baseline order vertical slice | Stage 2 | `backend-core` | - | `code-reviewer` | `PENDING` | 0 | - |
+| **4** | Optimized reservation, idempotency, NATS & worker | Stage 2, 3 | `backend-core` | `infra-devops` | `code-reviewer` | `PENDING` | 0 | - |
+| **5** | Payment simulator, confirm/fail/timeout/cancel & restock | Stage 3, 4 | `backend-core` | `payment-integrations` | `code-reviewer` | `PENDING` | 0 | - |
+| **6** | SePay adapter thật cho UI | Stage 5 | `payment-integrations` | `backend-core` | `code-reviewer` | `PENDING` | 0 | - |
+| **7** | Observability, metrics, logs & reliability baseline | Stage 3, 4, 5 | `observability-reliability` | `backend-core`, `infra-devops` | `code-reviewer` | `PENDING` | 0 | - |
+| **8** | Frontend product flow & design system | Stage 5 | `frontend-ui` | - | `code-reviewer` | `PENDING` | 0 | - |
+| **9** | War Room dashboard & chaos controller | Stage 7, 8 | `frontend-ui` | `backend-core`, `infra-devops` | `code-reviewer` | `PENDING` | 0 | - |
+| **10** | QA test pyramid, concurrency & invariant verifier | Stage 3–9 | `qa-loadtest` | `backend-core` | `code-reviewer` | `PENDING` | 0 | - |
+| **11** | k6 benchmark & fair comparison | Stage 7, 10 | `qa-loadtest` | `infra-devops` | `code-reviewer` | `PENDING` | 0 | - |
+| **12** | Chaos, resilience, soak & system testing | Stage 7, 9, 10, 11 | `qa-loadtest` | `observability-reliability`, `infra-devops` | `code-reviewer` | `PENDING` | 0 | - |
+| **13** | Demo hardening, evidence pack & context handoff | Stage 11, 12 | `qa-loadtest` | `infra-devops`, `observability-reliability` | `code-reviewer` | `PENDING` | 0 | - |
+
+---
+
+## 4. Nhật ký phán quyết kỹ thuật (Technical Rulings Ledger)
+
+> Khi gặp điểm chưa rõ hoặc xung đột nhỏ giữa các bước mà không vi phạm Invariants I1–I5, Orchestrator ra quyết định ngay và ghi vào đây theo mẫu:
+> `- [Stage X] Ruling: <Quyết định> — Lý do: <Tại sao> — Rủi ro/Chi phí nếu sai: <Mức độ ảnh hưởng>`
+
+*(Chưa có phán quyết phát sinh)*
+
+---
+
+## 5. Nhật ký chi tiết từng Stage (Stage Execution Log)
+
+> Sau khi hoàn tất mỗi stage, Orchestrator ghi thêm một mục vào dưới đây gồm: Deliverables chính, Lệnh test đã chạy & kết quả, Tóm tắt kết quả Code Review, và Commit SHA.
+
+*(Chưa có stage nào hoàn thành)*
