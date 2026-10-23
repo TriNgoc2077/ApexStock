@@ -8,7 +8,7 @@
 
 ### 1.1. Mục đích
 
-War Room Dashboard phục vụ **một mục đích duy nhất**: cho hội đồng **nhìn thấy bằng mắt** sự khác biệt giữa hai kiến trúc khi chịu tải flash sale thực tế. Thay vì trình bày slide với số liệu tĩnh, dashboard hiển thị metric real-time, cho phép trigger chaos event ngay trên màn hình, và tự động tổng hợp bảng so sánh kết quả cuối cùng.
+War Room Dashboard phục vụ **một mục đích duy nhất**: cho hội đồng **nhìn thấy bằng mắt** sự khác biệt giữa hai kiến trúc khi chịu tải flash sale thực tế. Dashboard hiển thị metric real-time qua WebSocket, tự động tổng hợp bảng so sánh kết quả cuối cùng. **Benchmark chạy tuần tự; operator kill container trực tiếp trong demo, không có nút kill từ UI.**
 
 ### 1.2. Kịch bản demo từng bước
 
@@ -39,7 +39,7 @@ flowchart LR
 
 - Người trình bày chọn mức tải (ví dụ: **1.000 concurrent users**) và duration (**60 giây**).
 - Bấm nút **"Bắt đầu kiểm thử"** → nút chuyển thành **"Đang chạy..."** với animation pulse.
-- Backend gọi k6 script qua API, đồng thời gửi request đến **cả hai kiến trúc song song**.
+- Backend chạy k6 cho **từng kiến trúc theo thứ tự**, dùng cùng workload và resource budget đã khóa.
 - Timer đếm ngược xuất hiện trên header.
 
 #### Bước 3 — Quan sát metric tăng real-time
@@ -56,11 +56,11 @@ flowchart LR
   - **Optimized**: Latency ổn định (<100ms p99), error rate = 0%, RPS duy trì mức target.
 - Health indicator Baseline chuyển **vàng → đỏ**, tạo contrast visual rõ ràng.
 
-#### Bước 5 — Trigger Chaos: Kill API instance
+#### Bước 5 — Operator inject chaos trực tiếp
 
-- Người trình bày mở **Chaos Controls**, chọn target: `optimized-api-1`.
-- Bấm **"Kill"** → dialog xác nhận xuất hiện → xác nhận.
-- Activity Log ghi nhận: `[CHAOS] Container optimized-api-1 đã bị kill`.
+- Người trình bày/operator kill container trực tiếp bằng Docker CLI theo runbook.
+- War Room chỉ hiển thị activity log, health và recovery; **không cung cấp nút Kill/chaos control**.
+- Activity Log ghi nhận sự kiện sau khi health/metrics phát hiện thay đổi.
 
 #### Bước 6 — Quan sát spike và recovery
 
@@ -201,15 +201,14 @@ Dashboard được chia thành **5 vùng chính** theo chiều dọc, thiết k�
 
 ### 2.3. Control Bar (56px)
 
-Thanh điều khiển nằm ngay dưới header, background `bg-zinc-900/80` với `backdrop-blur-xl`, border-bottom `border-zinc-800`.
+Thanh điều khiển chỉ dùng để bắt đầu/dừng phiên benchmark tuần tự và chọn load/duration. Không có chaos kill control; operator kill container trực tiếp theo runbook.
 
 | Thành phần | Kiểu | Chi tiết |
 |------------|------|----------|
 | **Nút Bắt đầu / Dừng** | Primary button | Trạng thái idle: `"Bắt đầu kiểm thử"`, bg-emerald-600, hover:bg-emerald-500. Trạng thái running: `"Dừng kiểm thử"`, bg-red-600, pulse animation. Trạng thái loading: spinner + `"Đang khởi tạo..."` |
 | **Load level** | Select dropdown | Options: `100 / 500 / 1.000 / 2.000 / 5.000` concurrent users. Default: `1.000`. Disabled khi test đang chạy. |
 | **Duration** | Select dropdown | Options: `30s / 60s / 120s / 180s / 300s`. Default: `60s`. |
-| **Chaos target** | Select dropdown | Options: `baseline-api-1`, `baseline-api-2`, `optimized-api-1`, `optimized-api-2`, `redis`, `postgres`. Grouped theo kiến trúc. |
-| **Kill** | Danger button | `bg-red-600`, icon skull. Disabled khi không có target. Trigger confirmation dialog. |
+| **Chaos action** | Read-only status | Không có action kill trong UI. Operator kill container trực tiếp theo runbook; UI chỉ quan sát health/recovery. |
 | **Pause / Resume** | Warning button | `bg-amber-600`, icon pause/play. Toggle giữa pause và resume. |
 
 **Trạng thái nút theo lifecycle:**

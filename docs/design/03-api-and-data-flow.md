@@ -345,17 +345,17 @@ sequenceDiagram
         API->>DB: INSERT webhook_log (unmatched)
         API-->>SP: 200 OK
     end
-    alt Đơn đã expired/paid
-        API->>DB: INSERT webhook_log (late_payment, status=refund_pending)
-        API-->>SP: 200 OK
+    alt Đơn đã expired
+        API->>DB: INSERT webhook_logs {order_id, status='refund', provider='simulator'}
+        API-->>SP: 200 OK (admin xử lý refund sau)
     end
     alt Số tiền không khớp
         API->>DB: INSERT webhook_log (amount_mismatch)
         API-->>SP: 200 OK
     end
 
-    Note over API: Cập nhật trạng thái
-    API->>DB: UPDATE orders SET status=paid WHERE id=?
+    Note over API: Cập nhật trạng thái chỉ khi đơn chưa expired
+    API->>DB: UPDATE orders SET status=paid WHERE id=? AND status='pending_payment'
     API->>DB: INSERT INTO payments {transaction_ref, amount, status=completed}
     API->>RC: EVALSHA confirm_stock.lua [item_id] -- Xác nhận kho đã trừ
     API->>RC: SET webhook:{transaction_ref} "processed" EX 86400

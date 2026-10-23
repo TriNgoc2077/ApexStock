@@ -333,15 +333,27 @@ CREATE TABLE idempotency_keys (
 );
 
 -- Cleanup expired keys (cron job)
+-- Dùng index thường; điều kiện thời gian nằm trong query, không nằm trong predicate index động.
 CREATE INDEX idx_idempotency_keys_expires
-    ON idempotency_keys (expires_at)
-    WHERE expires_at < now();  -- Không dùng partial index ở đây vì điều kiện thay đổi
+    ON idempotency_keys (expires_at);
 ```
 
 > [!TIP]
 > Bảng `idempotency_keys` là **fallback** khi Redis cache miss. Flow: kiểm tra Redis trước → nếu miss, kiểm tra PostgreSQL → nếu miss, xử lý request mới và ghi cả Redis lẫn PostgreSQL.
 
-### 1.12. Tổng hợp chiến lược Index
+CREATE TABLE webhook_logs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    order_id UUID REFERENCES orders(id),
+    provider VARCHAR(50) NOT NULL,
+    transaction_ref VARCHAR(255),
+    status VARCHAR(50) NOT NULL, -- refund, unmatched, amount_mismatch, processed
+    payload JSONB,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_webhook_logs_order ON webhook_logs (order_id, created_at DESC);
+
+
 
 | Index | Loại | Bảng | Mục đích | Kích thước ước tính |
 |---|---|---|---|---|

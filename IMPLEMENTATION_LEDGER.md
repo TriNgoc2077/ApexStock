@@ -7,12 +7,12 @@
 
 ## 1. Trạng thái thực thi hiện tại (Current Execution State)
 
-- **Overall Status:** `READY`
-- **Current Stage:** `Stage 0`
-- **Current Phase:** `PRE_FLIGHT` (`PRE_FLIGHT` | `IMPLEMENT` | `REVIEW_ROUND_1` | `REVIEW_ROUND_2` | `REVIEW_ROUND_3` | `VERIFY` | `COMMITTED`)
-- **Base Commit SHA:** `b1eebb0`
-- **Last Completed Stage:** `NONE`
-- **Last Completed Commit SHA:** `b1eebb0`
+- **Overall Status:** `IN_PROGRESS`
+- **Current Stage:** `Stage 1 (or Parallel Lanes 1–4)`
+- **Current Phase:** `READY` (`PRE_FLIGHT` | `IMPLEMENT` | `REVIEW_ROUND_1` | `REVIEW_ROUND_2` | `VERIFY` | `COMMITTED`)
+- **Base Commit SHA:** `a154b1a`
+- **Last Completed Stage:** `Stage 0`
+- **Last Completed Commit SHA:** `a154b1a`
 
 ---
 
@@ -41,7 +41,7 @@
 
 | Stage | Tên Stage | Phụ thuộc | Primary Agent | Support Agent(s) | Reviewer | Status | Fix Rounds | Commit SHA |
 |---:|---|---|---|---|---|---|---:|---|
-| **0** | Contract, decision gate & skeleton docs | None | `stages-planner` / `backend-core` | `infra-devops` | `code-reviewer` | `PENDING` | 0 | - |
+| **0** | Contract, decision gate & skeleton docs | None | `stages-planner` / `backend-core` | `infra-devops` | `code-reviewer` | `COMPLETED` | 0 | `stage-0` |
 | **1** | Host foundation, Docker Compose & health slice | Stage 0 | `infra-devops` | `backend-core`, `frontend-ui` | `code-reviewer` | `PENDING` | 0 | - |
 | **2** | PostgreSQL migration, Redis keyspace & seed/reset | Stage 1 | `backend-core` | `infra-devops` | `code-reviewer` | `PENDING` | 0 | - |
 | **3** | Baseline order vertical slice | Stage 2 | `backend-core` | - | `code-reviewer` | `PENDING` | 0 | - |

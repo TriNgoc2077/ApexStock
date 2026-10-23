@@ -1,0 +1,108 @@
+# ApexStock Benchmark & Resource Parity Matrix (Decision Gate D0.9, D0.10, D0.11)
+# Host mục tiêu: Laptop Intel Core i5-10500H (6C/12T), 16GB RAM, NVMe SSD, Docker Compose
+# LƯU Ý: Mọi con số RPS/latency mục tiêu dưới đây là HYPOTHESIS, không phải kết quả thực nghiệm.
+
+version: "1.0"
+host_constraints:
+  cpu_model: "Intel Core i5-10500H (6C/12T)"
+  total_ram_mb: 16384
+  storage: "NVMe SSD"
+  execution_mode: "sequential" # Bắt buộc chạy tuần tự từng kiến trúc khi đo benchmark chính thức (D0.11)
+
+common_workload:
+  endpoint: "POST /api/v1/flash-sale/orders"
+  single_item_per_order: true # D0.4
+  baseline_base_url: "http://localhost:8081"
+  optimized_base_url: "http://localhost:8082"
+  min_runs_per_scenario: 3
+  require_invariant_check_post_run: true
+
+seed_dataset:
+  flash_sale_id: "11111111-1111-1111-1111-111111111111"
+  item_id: "22222222-2222-2222-2222-222222222222"
+  initial_stock: 10000
+  max_per_user: 5
+  seeded_users: 50000
+  reservation_ttl_seconds: 300
+
+profiles:
+  dev:
+    description: "Chạy tối thiểu cho phát triển local"
+  demo:
+    description: "Chạy giao diện Next.js + War Room + cả 2 nhánh cho trình diễn trực quan"
+  benchmark:
+    description: "Khóa cứng CPU/RAM, chạy tuần tự từng kiến trúc, không bật browser UI nặng"
+
+resource_budgets:
+  shared_infra:
+    postgresql:
+      cpus: "2.0"
+      mem_limit: "2048m"
+    prometheus:
+      cpus: "0.5"
+      mem_limit: "512m"
+    grafana:
+      cpus: "0.25"
+      mem_limit: "256m"
+
+  baseline_topology:
+    api_baseline:
+      replicas: 1
+      port: 8081
+      cpus: "2.0"
+      mem_limit: "1024m"
+    total_app_cpus: "2.0"
+    total_app_mem_mb: 1024
+
+  optimized_topology:
+    nginx_lb:
+      replicas: 1
+      port: 8082
+      cpus: "0.5"
+      mem_limit: "256m"
+    api_optimized:
+      replicas: 2
+      cpus_per_replica: "0.75"
+      mem_limit_per_replica: "384m"
+    redis:
+      replicas: 1
+      maxmemory: "512mb"
+      maxmemory_policy: "noeviction" # D0.13
+      cpus: "1.0"
+      mem_limit: "640m"
+    nats_jetstream:
+      replicas: 1
+      cpus: "0.5"
+      mem_limit: "512m"
+    worker:
+      replicas: 1
+      cpus: "1.0"
+      mem_limit: "512m"
+
+scenarios:
+  smoke:
+    vus: 10
+    duration: "30s"
+    purpose: "Kiểm tra kết nối, contract và invariant trước khi chạy tải"
+  flash_sale_shock:
+    vus: 500
+    duration: "60s"
+    purpose: "Mô phỏng đột biến tranh chấp cùng 1 sản phẩm (Hot-spot contention)"
+  max_sustainable_throughput:
+    stages:
+      - duration: "30s"
+        target: 100
+      - duration: "60s"
+        target: 500
+      - duration: "60s"
+        target: 1000
+    purpose: "Tìm ngưỡng thông lượng bền vững trước khi p95 vượt ngưỡng hoặc xuất hiện 5xx"
+  resilience_api_kill:
+    vus: 200
+    duration: "90s"
+    fault_injection: "Kill 1 replica api-optimized tại giây thứ 30"
+    purpose: "Đo thời gian phục hồi và xác minh không mất/trùng đơn"
+  soak:
+    vus: 150
+    duration: "10m"
+    purpose: "Kiểm tra rò rỉ goroutine, bộ nhớ, connection pool và độ lệch tồn kho"

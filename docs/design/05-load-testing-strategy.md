@@ -34,7 +34,7 @@
 
 ### Scenario 1: Throughput tối đa (Max RPS)
 
-**Mục tiêu:** Tìm ngưỡng RPS tối đa mà hệ thống còn giữ error rate < 1%.
+**Mục tiêu:** Tìm ngưỡng RPS tối đa mà hệ thống còn giữ error rate < 1%. Mọi RPS/latency nêu trong tài liệu là **hypothesis/acceptance candidate** cho đến khi có measured artifact.
 
 **Cấu hình k6:**
 ```javascript
@@ -127,10 +127,10 @@ export default function () {
   const idempotencyKey = `${userId}_${ITEM_ID}_${__ITER}`;
 
   // Phase 1: Đặt hàng
-  const orderRes = http.post(`${BASE_URL}/api/v1/flash-sale/order`, JSON.stringify({
+  const orderRes = http.post(`${BASE_URL}/api/v1/flash-sale/orders`, JSON.stringify({
     idempotency_key: idempotencyKey,
-    user_id: userId,
-    items: [{ flash_sale_item_id: ITEM_ID, quantity: 1 }],
+    flash_sale_item_id: ITEM_ID,
+    quantity: 1,
   }), {
     headers: { 'Content-Type': 'application/json' },
     timeout: '3s',
@@ -217,7 +217,7 @@ export const options = {
 **Script điều phối (chạy ngoài k6):**
 ```bash
 #!/bin/bash
-# Chạy song song: k6 load + chaos injection
+# Chạy benchmark tuần tự; operator inject chaos trực tiếp ngoài UI khi demo
 
 # Bắt đầu tải
 k6 run --env BASE_URL=http://optimized:8080 scenarios/flash_sale.js &
@@ -355,7 +355,7 @@ var (
 
 > **Note:** Optimized có thêm 1 CPU nhưng đó là chi phí của queue+worker. Kết quả vẫn so sánh được vì RAM bằng nhau và CPU overhead của queue nhỏ.
 
-### 4.2 Quy trình test chuẩn
+**Quy trình test:** Chạy tuần tự từng architecture với cùng resource budget khóa trước; không chạy Baseline và Optimized đồng thời.
 
 ```bash
 #!/bin/bash

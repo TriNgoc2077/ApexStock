@@ -62,10 +62,10 @@ Không triển khai distributed production thật. Nhiều process/container ch�
 | Baseline | `SELECT ... FOR UPDATE` nằm trong transaction; không dùng Redis/queue để làm sai baseline; order thành công và 409 hết hàng đúng |
 | Optimized | Reserve atomic bằng Lua; publish/ghi order theo contract đã chốt; worker redelivery không duplicate side effect |
 | Inventory | Không stock âm/oversell; release/confirm lặp lại không đổi kết quả; reconciliation cuối run pass |
-| Payment | Simulator và SePay adapter dùng chung state machine; duplicate/out-of-order/late/mismatch được xử lý có audit |
+| Payment | Simulator trước; simulator và adapter provider-neutral dùng chung state machine. SePay thật chỉ là stage tùy chọn sau khi có evidence/config; duplicate/out-of-order/late/mismatch được xử lý có audit |
 | Observability | Metrics phân biệt 2xx/409/429/5xx, có p50/p95/p99, queue lag, stock và invariant counters |
 | Frontend | Không hardcode benchmark; có stale/error/loading/reconnect; reduced-motion và keyboard flow hoạt động |
-| War Room | Có snapshot/live stream, start/stop, health, activity log, summary; chaos không gọi Docker trực tiếp từ browser |
+| War Room | Có snapshot/live stream bằng WebSocket, start/stop benchmark tuần tự, health, activity log, summary; chaos do operator thực hiện trực tiếp, UI chỉ quan sát |
 | Benchmark | Hai kiến trúc chạy tuần tự với parity; có raw summary, metadata môi trường, median/variance; không claim nếu invariant fail |
 | Reliability | API kill có cleanup/recovery; Redis/DB/queue failure có runbook và test riêng trong môi trường local |
 
@@ -139,7 +139,7 @@ Hai implementation phải dùng:
 - Profile observability bật Prometheus/Grafana/cAdvisor khi đo hoặc demo; không bắt mọi developer run cùng toàn bộ stack.
 - Không bật Baseline và Optimized benchmark đồng thời.
 - Redis inventory không được dùng eviction policy có thể xóa key stock. Phải chốt `noeviction` hoặc cơ chế bảo vệ tương đương và để lại headroom.
-- Resource limits là budget kiểm thử, không phải kết quả năng lực. Mọi thay đổi phải ghi trong benchmark metadata.
+- Resource limits là budget kiểm thử **được khóa trước mỗi run**, không phải kết quả năng lực. Benchmark chạy tuần tự từng architecture; mọi thay đổi phải ghi trong benchmark metadata.
 
 ---
 
@@ -334,7 +334,7 @@ Các stage 6 và 8 có thể triển khai song song sau khi stage 5 cung cấp c
 
 **Files:** `cmd/api-baseline/main.go`, `internal/domain/*.go`, `internal/httpapi/order_handler.go`, `internal/baseline/order_service.go`, `internal/persistence/postgres/order_repository.go`, `internal/payments/simulator.go`, test files
 
-**Acceptance:** Request hợp lệ tạo đúng một order/pending payment và trừ inventory; concurrent không oversell/stock âm; duplicate key không tạo order thứ hai; cùng key khác payload bị reject; transaction rollback không để dở dang; race detector pass.
+**Acceptance:** Request hợp lệ tạo đúng một order/pending payment và reserve inventory; concurrent không oversell/stock âm; duplicate key không tạo order thứ hai; cùng key khác payload bị reject; `quantity != 1` bị reject; transaction rollback không để dở dang; race detector pass.
 
 **Handoff:** Stage 4 reuse DTO/error/metrics naming nhưng không reuse Baseline persistence implementation. Stage 10 lấy Baseline test vector làm oracle.
 
@@ -342,18 +342,16 @@ Các stage 6 và 8 có thể triển khai song song sau khi stage 5 cung cấp c
 
 ## Stage 4 — Optimized reservation, idempotency, NATS và worker
 
-**Mục tiêu:** Implement đường Optimized với Redis/Lua atomic inventory, queue/worker durable theo D0.1 và không mất order khi crash.
+**Mục tiêu:** Implement đường Optimized với Redis/Lua atomic inventory, NATS JetStream persistent on disk, API trả 201 sau durable publish theo D0.1 và không mất order khi crash.
 
 **Deliverables:**
-- Optimized API order slice.
-- Lua scripts: claim-and-reserve/reserve/release/confirm/cleanup.
-- NATS JetStream stream/consumer bootstrap.
+- `POST /api/v1/flash-sale/orders` trả 201 Created sau khi order/payment command đã được publish durable vào NATS JetStream persistent on disk; `<5ms` chỉ là hypothesis. Worker redelivery không duplicate order.
 - Worker order persistence/retry/DLQ.
 - Recovery/reconciliation command.
 
 **Files:** `cmd/api-optimized/main.go`, `cmd/worker/main.go`, `internal/optimized/order_service.go`, `internal/inventory/redis_repository.go`, `internal/inventory/lua/*.lua`, `internal/messaging/*.go`, tests
 
-**Acceptance:** Concurrent reserve không làm stock âm; cùng idempotency key chỉ một reserve; multi-item all-or-nothing; publish/worker retry không duplicate order; release/confirm lặp lại no-op; Redis down fail fast 503; NATS restart giữ message; DB chậm không mất durable command; race/integration tests pass.
+**Acceptance:** Concurrent reserve một item không làm stock âm; cùng idempotency key chỉ một reserve; publish durable JetStream/worker retry không duplicate order; release/confirm lặp lại no-op; Redis down fail fast 503; NATS restart giữ message; DB chậm không mất durable command; race/integration tests pass.
 
 **Handoff:** Stage 5 chỉ gọi public use case; không tự thao tác Redis key. Stage 7 dùng metrics names đã ổn định. Stage 10 dùng event fixtures kiểm tra at-least-once.
 
@@ -440,7 +438,7 @@ Các stage 6 và 8 có thể triển khai song song sau khi stage 5 cung cấp c
 **Deliverables:**
 - War Room API/WebSocket: snapshot metrics, live stream, test lifecycle, activity log, stale/reconnect.
 - Test runner controller chỉ gọi allowlist profile/script, tuần tự benchmark, parallel demo phải gắn nhãn.
-- Chaos controller: browser không gọi socket; Go controller localhost-only/auth/allowlist; confirm/cooldown/audit; mặc định chỉ kill API Optimized; Redis/DB advanced có cảnh báo.
+- Chaos controller: **không có kill từ UI**; operator kill container trực tiếp theo runbook. War Room chỉ quan sát qua WebSocket, ghi activity/recovery; các chức năng khác localhost-only/auth/allowlist nếu cần.
 - Frontend `/war-room`: header aurora, control bar, Baseline/Optimized panel, charts, oversell indicator, summary, activity log, stale badge, reconnect.
 
 **Files:** `cmd/warroom-controller/main.go`, `internal/warroom/*.go`, `internal/chaos/*.go`, `web/app/war-room/**/*`, tests
@@ -459,7 +457,7 @@ Các stage 6 và 8 có thể triển khai song song sau khi stage 5 cung cấp c
 - Unit tests state machines, validation/error mapping, Lua, backoff/circuit breaker, payment provider mapping.
 - Contract tests common order API, error/status/body, simulator/payment/webhook, War Room protocol.
 - Integration tests với PostgreSQL/Redis/NATS.
-- Concurrency tests: same item shock, same key, different users max-per-user, multi-item all-or-nothing, payment vs expiry vs cancel, worker redelivery/crash before ACK, Redis restart/rebuild.
+- Concurrency tests: same item shock, same key, different users max-per-user, payment vs expiry vs cancel, worker redelivery/crash before ACK, Redis restart/rebuild.
 - Invariant verifier chạy sau mỗi scenario: stock equation, no negative/oversell, no duplicate order/event, all reservation terminally confirmed/released, order/payment terminal state valid.
 - E2E browser simulator flow.
 - Security checks secrets/authz/webhook/chaos endpoint/SQL injection.
@@ -597,25 +595,29 @@ demo hardening + measured evidence handoff
 - [ ] Nếu chạm payment: đã kiểm tra duplicate, late, mismatch, out-of-order và audit.
 - [ ] Nếu chạm metric: label cardinality thấp, query phân biệt business rejection/system failure.
 - [ ] Nếu chạm frontend: không hardcode benchmark, có stale/error/reduced-motion.
-- [ ] Nếu chạm chaos: allowlist/auth/confirmation/audit/cleanup.
+- [ ] Nếu chạm chaos: có runbook/operator confirmation, không có kill từ UI, và cleanup.
 - [ ] Có lệnh verification cụ thể và output được lưu khi cần.
 - [ ] Có rollback hoặc feature flag; không phá đường chạy Baseline/seed/reset.
 - [ ] Handoff đã nêu file, config, known limitation và bước kế tiếp.
 
 ---
 
-## 11. Các giả định đang dùng trong kế hoạch
+## 11. Các quyết định đã chốt áp dụng xuyên suốt kế hoạch
 
-1. Chỉ một host; Docker Compose đủ cho mục tiêu trình diễn.
-2. PostgreSQL là durable source cho order/payment, Redis là hot inventory/idempotency state theo semantics được D0 chốt.
-3. NATS JetStream là queue được ưu tiên trong SDD vì footprint phù hợp; thay đổi queue phải cập nhật resource matrix và contract.
-4. k6 là load generator chính; chạy cùng host nên mọi kết quả là host-local measurement, không đại diện production.
-5. SePay thật chỉ có trong UI demo khi user cung cấp config hợp lệ; simulator là đường test mặc định.
-6. War Room là custom Next.js page và Go controller; Grafana vẫn là nguồn quan sát/đối chiếu.
-7. Các số trong SDD như `>3.000 RPS`, `<10s`, `200–500 RPS`, `p95 <500ms` chỉ là target/hypothesis cho tới khi raw benchmark xác minh.
-8. Không giả định cơ chế signature hay payload SePay ngoài tài liệu/config đã kiểm chứng.
+1. Dùng common contract `POST /api/v1/flash-sale/orders`; Baseline bind `:8081`, Optimized bind `:8082`; cùng schema và validation.
+2. Redis Lua chỉ xử lý một item/order; multi-item nằm ngoài phạm vi hiện tại.
+3. Payment simulator triển khai trước; SePay thật là stage tùy chọn sau khi có evidence/config.
+4. Late payment sau expiry giữ order `expired` và ghi `webhook_logs.status='refund'`; không chuyển `paid`.
+5. User pages dùng polling; War Room dùng WebSocket.
+6. Chỉ một host; Docker Compose đủ cho mục tiêu trình diễn.
+7. PostgreSQL là durable source cho order/payment, Redis là hot inventory/idempotency state theo semantics được D0 chốt.
+8. NATS JetStream persistent on disk là queue bắt buộc cho Optimized; API trả 201 Created; `<5ms` là hypothesis.
+9. k6 là load generator chính; benchmark chạy tuần tự với RAM/CPU budget khóa trước, mọi kết quả là host-local measurement.
+10. War Room không có tính năng kill từ UI; operator kill container trực tiếp trong demo theo runbook.
+11. Các số trong SDD như `>3.000 RPS`, `<10s`, `200–500 RPS`, `p95 <500ms` chỉ là target/hypothesis cho tới khi raw benchmark xác minh.
+12. Không giả định cơ chế signature hay payload SePay ngoài tài liệu/config đã kiểm chứng.
 
-Nếu một giả định bị bác bỏ, cập nhật decision record, contract, dependency table và các stage liên quan trước khi code tiếp.
+Nếu một quyết định bị thay đổi, cập nhật decision record, contract, dependency table và các stage liên quan trước khi code tiếp.
 
 ---
 

@@ -26,7 +26,7 @@
 
 ## 1. Tổng quan dự án
 
-**ApexStock** là hệ thống bán hàng online được thiết kế để chịu tải cực cao trong kịch bản flash sale. Dự án được xây dựng với **hai kiến trúc song song** để so sánh khách quan:
+**ApexStock** là hệ thống bán hàng online được thiết kế để chịu tải cực cao trong kịch bản flash sale. Dự án được xây dựng với **hai kiến trúc** để so sánh khách quan:
 
 - **Baseline:** Kiến trúc đơn giản, đồng bộ – Go API → PostgreSQL trực tiếp
 - **Optimized:** Kiến trúc tối ưu – Go API → Redis (Lua) → NATS JetStream → PostgreSQL
@@ -328,7 +328,7 @@ Worker → UPDATE order status=expired → Lua release_stock → stock tăng l�
 
 ### 6.3 Idempotency race condition
 
-Khi 2 request cùng key đến đồng thời: Redis `SET NX` đảm bảo chỉ 1 request thắng. Request thua nhận 202 + retry sau khi request thắng hoàn tất.
+Khi 2 request cùng key đến đồng thời: Redis `SET NX` đảm bảo chỉ 1 request thắng. Request thua nhận 409 Conflict với thông tin về request đang xử lý.
 
 ---
 
@@ -398,15 +398,18 @@ Khi 2 request cùng key đến đồng thời: Redis `SET NX` đảm bảo chỉ
 └──────────────────────────────────────────────────────────────────────┘
 ```
 
-### 8.2 Chaos Controls
+### 8.2 Chaos Operations
 
-| Nút | Hành động | An toàn |
-|-----|-----------|---------|
-| Kill API-1 | `docker kill apexstock-api-1` | Confirm dialog + auto-resume 30s |
-| Kill API-2 | `docker kill apexstock-api-2` | Như trên |
-| Kill Redis | `docker kill apexstock-redis` | Cảnh báo nghiêm trọng |
-| Kill DB | `docker kill apexstock-postgres` | Cảnh báo nghiêm trọng |
-| Pause/Resume | `docker pause/unpause` | Confirm dialog |
+Chaos testing do operator thực hiện trực tiếp bằng kill container theo runbook:
+
+| Hành động | Lệnh | Quan sát |
+|-----------|------|----------|
+| Kill API Baseline | `docker kill apexstock-baseline-api-1` | Nginx reroute, health check fail |
+| Kill API Optimized | `docker kill apexstock-optimized-api-1` | Worker retry, queue tồn tại |
+| Kill Redis | `docker kill apexstock-redis` | Optimized fail fast 503, cần runbook phục hồi |
+| Kill DB | `docker kill apexstock-postgres` | Baseline/Optimized fail, worker chờ reconnect |
+
+War Room dashboard hiển thị health status, activity log và recovery time; không có control kill từ UI.
 
 ---
 

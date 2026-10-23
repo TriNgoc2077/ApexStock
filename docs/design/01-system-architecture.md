@@ -99,13 +99,13 @@ flowchart TB
 | **Next.js Frontend** | Giao diện người dùng, War Room dashboard | SPA với SSR cho SEO, Framer Motion cho UX mượt mà |
 | **Nginx** | Load balancer, rate limiting, SSL termination | Phân tải giữa nhiều API instance, chặn request thừa ở tầng edge |
 | **Go API Server** | Xử lý HTTP request, business logic | Go có goroutine nhẹ, GC nhanh, phù hợp high-concurrency |
-| **Redis** | Cache tồn kho, idempotency keys, rate limit counters, distributed locks | Latency ~0.1ms, atomic operations qua Lua scripts |
-| **Message Queue** | Buffer đơn hàng, decouple API và order processing | Đảm bảo không mất đơn khi hệ thống quá tải, xử lý bất đồng bộ |
-| **Order Workers** | Consumer xử lý đơn hàng từ queue | Tách biệt tốc độ nhận request và tốc độ ghi DB |
-| **PostgreSQL** | Lưu trữ bền vững: users, products, orders, payments | ACID compliance, dữ liệu quan trọng cần durability |
+| **Redis** | Cache tồn kho, idempotency keys, rate limit counters | `noeviction`; không eviction inventory keys; atomic operations qua Lua scripts |
+| **Message Queue** | **NATS JetStream persistent on disk** | Buffer đơn hàng durable, không mất order khi crash |
+| **Order Workers** | Consumer xử lý đơn hàng từ JetStream | Tách tốc độ nhận request và tốc độ ghi DB |
+| **PostgreSQL** | Lưu trữ bền vững: users, products, orders, payments, webhook_logs | ACID compliance, dữ liệu quan trọng cần durability |
 | **Prometheus** | Thu thập metrics | Time-series DB tối ưu cho monitoring |
 | **Grafana** | Hiển thị metrics, alerting | Dashboard linh hoạt, tích hợp sẵn với Prometheus |
-| **War Room Dashboard** | So sánh hai kiến trúc real-time | Custom UI hiển thị side-by-side + chaos controls |
+| **War Room Dashboard** | So sánh hai kiến trúc real-time qua WebSocket | Custom UI hiển thị side-by-side; operator kill container trực tiếp |
 
 ---
 
@@ -115,11 +115,20 @@ flowchart TB
 
 Kiến trúc Baseline đại diện cho cách tiếp cận **truyền thống nhất** để xây dựng hệ thống e-commerce: một API server duy nhất kết nối trực tiếp tới PostgreSQL. Mọi thao tác đều đồng bộ, mọi ràng buộc đều do database đảm nhận.
 
-**Đặc điểm chính:**
-- Không có cache layer
-- Không có message queue
-- Không có xử lý bất đồng bộ
-- Toàn bộ logic nằm trong một DB transaction
+- Baseline API lắng nghe `:8081`
+- Optimized API lắng nghe `:8082`
+- Cả hai expose chung `POST /api/v1/flash-sale/orders`, chung schema và validation
+- Benchmark chạy tuần tự với CPU/RAM budget đã khóa
+
+Cả hai implementation dùng cùng public contract:
+
+```text
+POST /api/v1/flash-sale/orders
+```
+
+- Baseline: `http://localhost:8081`
+- Optimized: `http://localhost:8082`
+- Schema/validation giống nhau; chỉ khác implementation phía sau.
 
 ### 2.2. Luồng xử lý đặt hàng
 
@@ -129,7 +138,7 @@ sequenceDiagram
     participant API as Go API Server
     participant DB as PostgreSQL
 
-    C->>API: POST /api/v1/baseline/orders<br/>{product_id, quantity}
+    C->>API: POST /api/v1/flash-sale/orders<br/>{flash_sale_item_id, quantity: 1}
     activate API
 
     API->>DB: BEGIN TRANSACTION
@@ -321,11 +330,11 @@ sequenceDiagram
     participant NGX as Nginx
     participant API as Go API (any instance)
     participant R as Redis
-    participant Q as Message Queue
+    participant Q as NATS JetStream
     participant W as Order Worker
     participant DB as PostgreSQL
 
-    C->>NGX: POST /api/v1/optimized/orders<br/>{product_id, qty, idempotency_key}
+    C->>NGX: POST /api/v1/flash-sale/orders<br/>{flash_sale_item_id, quantity: 1, idempotency_key}
     NGX->>NGX: Rate limit check (100 req/s/IP)
 
     alt Rate limit exceeded
@@ -353,8 +362,9 @@ sequenceDiagram
     API->>API: Generate order_id (ULID)
     API->>R: SETEX idempotency:{key}<br/>86400 {order_id, status: "pending"}
 
-    API->>Q: Publish to "orders.pending"<br/>{order_id, user_id, product_id,<br/>qty, price, idempotency_key,<br/>timestamp}
-    API-->>C: 202 Accepted<br/>{order_id, status: "pending",<br/>poll_url: "/orders/{id}/status"}
+    API->>Q: Publish durable order to JetStream (persistent on disk)
+    Q-->>API: publish ack
+    API-->>C: 201 Created<br/>{order_id, status: "pending_payment"}
 
     %% Step 4: Async Order Processing
     Q->>W: Deliver message
@@ -547,7 +557,7 @@ flowchart TD
     B -->|Tồn tại| C["Trả về cached response<br/>200 OK (không tạo đơn mới)"]
     B -->|Không tồn tại| D["Xử lý request bình thường"]
     D --> E["Redis: SETEX idempotency:abc123<br/>TTL=86400<br/>Value={order_id, status, response}"]
-    E --> F["Trả về response mới<br/>202 Accepted"]
+    E --> F["Trả về response mới<br/>201 Created"]
 ```
 
 #### Cách tạo Idempotency Key
@@ -567,7 +577,7 @@ Key:   idempotency:{idempotency_key}
 Value: {
   "order_id": "01HQABC...",
   "status": "pending" | "confirmed" | "failed",
-  "http_status": 202,
+  "http_status": 201,
   "response_body": "{...}",
   "created_at": "2024-10-22T10:30:00Z"
 }
@@ -693,7 +703,7 @@ server {
 |---|---|---|
 | **Redis** | Circuit breaker mở → API trả lời ngay, không thử mua | `503 Service Temporarily Unavailable` — "Hệ thống đang bận, vui lòng thử lại sau" |
 | **Message Queue** | Circuit breaker mở → Không thể đặt hàng, tồn kho không bị trừ (chưa ghi Redis) | `503` — "Hệ thống đang bận" |
-| **PostgreSQL** | Workers tạm dừng → Đơn hàng tồn trong queue → Tự xử lý khi DB phục hồi | `202 Accepted` vẫn được trả cho user (đơn hàng sẽ được xử lý sau) |
+| **PostgreSQL** | Workers tạm dừng → Đơn hàng tồn trong NATS JetStream queue → Tự xử lý khi DB phục hồi | `201 Created` đã được trả sau khi message durable trong queue |
 | **1 API instance** | Nginx tự phát hiện qua health check → Chuyển traffic sang instance còn lại | Không ảnh hưởng (transparent failover) |
 | **1 Worker instance** | Worker còn lại tiếp tục consume → Throughput giảm 50% | Đơn hàng xử lý chậm hơn nhưng không mất |
 
@@ -821,7 +831,7 @@ sequenceDiagram
     A1->>R: Inventory check
     R-->>A1: OK
     A1->>Q: Publish order
-    A1-->>LB: 202 Accepted
+    A1-->>LB: 201 Created
     LB-->>LB: Tiếp tục route tới A1 và A2
 
     Note over LB: Mọi request mới chỉ<br/>đi tới API #1 và #2
@@ -936,7 +946,7 @@ sequenceDiagram
 
     API->>R: Inventory decrement ✅
     API->>Q: Publish order ✅
-    API-->>API: 202 Accepted ✅
+    API-->>API: 201 Created ✅
 
     Q->>W: Deliver message
     W->>DB: INSERT INTO orders...
@@ -962,8 +972,8 @@ sequenceDiagram
 
 | Metric | Baseline khi DB chậm | Optimized khi DB chậm |
 |---|---|---|
-| User response | Timeout 30s → 504 | 202 Accepted trong ~5ms |
-| Đơn hàng bị mất | Có (timeout = mất) | Không (queue giữ) |
+| User response | Timeout 30s → 504 | 201 Created trong <10ms (hypothesis: <5ms) |
+| Đơn hàng bị mất | Có (timeout = mất) | Không (NATS JetStream giữ) |
 | Recovery | Cần restart, user retry thủ công | Tự động, worker retry |
 | Overselling risk | Có (lock timeout → release sớm) | Không (Redis đã reserve) |
 
