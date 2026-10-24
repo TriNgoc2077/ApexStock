@@ -1,17 +1,29 @@
 package main
 
 import (
+	"context"
+	"database/sql"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
 
+	"apexstock/internal/baseline"
 	"apexstock/internal/config"
+	"apexstock/internal/domain"
 	"apexstock/internal/httpapi"
+
+	_ "github.com/lib/pq"
 )
 
 func main() {
 	cfg := config.Load()
+	db, err := sql.Open("postgres", cfg.BaselineDSN)
+	if err != nil {
+		log.Fatalf("[api-baseline] database open failed: %v", err)
+	}
+	defer db.Close()
+	service := baseline.NewOrderService(db)
 
 	mux := http.NewServeMux()
 
@@ -21,11 +33,10 @@ func main() {
 		httpapi.ReadyzHandler(w, r, cfg.BaselineDSN)
 	})
 
-	// Flash sale order endpoint (stub)
-	mux.HandleFunc("POST /api/v1/flash-sale/orders", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusNotImplemented)
-		fmt.Fprintln(w, `{"error":"not_implemented","message":"Baseline reservation logic pending Stage 3"}`)
-	})
+	// Flash sale order endpoint
+	mux.Handle("POST /api/v1/flash-sale/orders", httpapi.BaselineOrderHandler(func(ctx context.Context, req domain.CreateOrderRequest) (domain.OrderResponse, error) {
+		return service.Create(ctx, req)
+	}))
 
 	addr := fmt.Sprintf(":%d", cfg.BaselinePort)
 	log.Printf("[api-baseline] Starting on %s", addr)
