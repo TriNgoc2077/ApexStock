@@ -30,6 +30,12 @@ func (r *OrderRepository) Create(ctx context.Context, req domain.CreateOrderRequ
 	}
 	defer tx.Rollback()
 
+	// Serialize claims for the same user/key even before the idempotency row exists.
+	// This closes the check-then-insert race while preserving replay semantics.
+	if _, err = tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock(hashtextextended($1 || ':' || $2, 0))`, req.UserID, req.IdempotencyKey); err != nil {
+		return domain.OrderResponse{}, err
+	}
+
 	var existingBody []byte
 	var existingStatus int
 	err = tx.QueryRowContext(ctx, `SELECT response_status, response_body FROM idempotency_keys WHERE key=$1 AND user_id=$2 FOR UPDATE`, req.IdempotencyKey, req.UserID).Scan(&existingStatus, &existingBody)

@@ -8,12 +8,12 @@
 ## 1. Trạng thái thực thi hiện tại (Current Execution State)
 
 - **Overall Status:** `IN_PROGRESS`
-- **Current Stage:** `Stage 2`
+- **Current Stage:** `Stage 3`
 - **Execution Mode:** `SEQUENTIAL` — một orchestrator duy nhất, chạy Stage 1 → Stage 13, mỗi lần một subagent
-- **Current Phase:** `VERIFY` (`READY` | `IMPLEMENT` | `CHECKPOINT_COMMITTED` | `REVIEW_ROUND_1` | `REVIEW_ROUND_2` | `VERIFY` | `COMMITTED`)
+- **Current Phase:** `COMMITTED` (`READY` | `IMPLEMENT` | `CHECKPOINT_COMMITTED` | `REVIEW_ROUND_1` | `REVIEW_ROUND_2` | `VERIFY` | `COMMITTED`)
 - **Base Commit SHA:** `91ce71c` (stage-0)
-- **Last Completed Stage:** `Stage 1`
-- **Last Completed Commit SHA:** `8ce7d19`
+- **Last Completed Stage:** `Stage 2`
+- **Last Completed Commit SHA:** `bc2ba07`
 
 ---
 
@@ -45,8 +45,8 @@
 |---:|---|---|---|---|---|---|---:|---|
 | **0** | Contract, decision gate & skeleton docs | None | `stages-planner` / `backend-core` | `infra-devops` | `code-reviewer` | `COMPLETED` | 0 | `91ce71c` |
 | **1** | Host foundation, Docker Compose & health slice | Stage 0 | `infra-devops` | `backend-core`, `frontend-ui` | `code-reviewer` | `COMPLETED` | 0 | `8ce7d19` |
-| **2** | PostgreSQL migration, Redis keyspace & seed/reset | Stage 1 | `backend-core` | `infra-devops` | `code-reviewer` | `VERIFY` | 0 | - |
-| **3** | Baseline order vertical slice | Stage 2 | `backend-core` | - | `code-reviewer` | `PENDING` | 0 | - |
+| **2** | PostgreSQL migration, Redis keyspace & seed/reset | Stage 1 | `backend-core` | `infra-devops` | `code-reviewer` | `COMPLETED` | 1 | `bc2ba07` |
+| **3** | Baseline order vertical slice | Stage 2 | `backend-core` | - | `code-reviewer` | `COMPLETED` | 1 | `-` |
 | **4** | Optimized reservation, idempotency, NATS & worker | Stage 2, 3 | `backend-core` | `infra-devops` | `code-reviewer` | `PENDING` | 0 | - |
 | **5** | Payment simulator, confirm/fail/timeout/cancel & restock | Stage 3, 4 | `backend-core` | `payment-integrations` | `code-reviewer` | `PENDING` | 0 | - |
 | **6** | SePay adapter thật cho UI | Stage 5 | `payment-integrations` | `backend-core` | `code-reviewer` | `PENDING` | 0 | - |
@@ -107,7 +107,37 @@ bash -n scripts/**/*.sh     # PASS
 
 **Commit SHA:** `8ce7d19`
 
-### Stage 2: PostgreSQL migration, Redis keyspace & seed/reset
+### Stage 3: Baseline order vertical slice
+
+**Phase:** COMMITTED  
+**Primary Agent:** backend-core  
+**Deliverables:**
+- Shared `POST /api/v1/flash-sale/orders` handler on Baseline `:8081`.
+- Contract validation for UUIDs, `quantity=1`, idempotency header/body and correlation ID.
+- PostgreSQL transaction with item `SELECT ... FOR UPDATE`, active-event/stock/max-per-user checks.
+- Atomic order, order item, simulated payment, baseline stock decrement and idempotency response persistence.
+- Idempotent replay and payload-conflict handling; advisory transaction lock closes same-key check-then-insert race.
+
+**Verification:**
+```bash
+gofmt -w ...                    # PASS
+go test ./...                   # PASS
+go vet ./...                    # PASS
+go test -race ./...             # PASS
+docker compose -f deploy/compose/docker-compose.yaml config -q  # PASS
+git diff --check                # PASS
+```
+
+**Review:** Round 1 found missing tracked dependency artifact and same-key concurrency race; fixes applied and re-verified.
+
+**Acceptance:**
+- ✅ Baseline endpoint uses the common API path and 201 response.
+- ✅ Baseline inventory mutation is transactional and row-locked.
+- ✅ Idempotency response is persisted and replayed for retries.
+- ✅ Same-key concurrent claims are serialized before the idempotency row exists.
+
+**Commit SHA:** `PENDING`
+
 
 **Phase:** VERIFY (pending commit)  
 **Primary Agent:** backend-core  
