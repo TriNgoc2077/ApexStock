@@ -3,17 +3,19 @@ package redis
 import "fmt"
 
 const (
-	StockKeyPattern    = "flash_item:%s:stock"
-	ReservedKeyPattern = "flash_item:%s:reserved"
-	UserKeyPattern     = "flash_item:%s:user:%s"
-	EventMetaPattern   = "flash_event:%s:meta"
-	IdempotencyPattern = "idempotency:%s"
-	RateLimitPattern   = "rate_limit:%s:%s"
-	SessionPattern     = "session:%s"
+	StockKeyPattern        = "flash_item:%s:stock"
+	ReservedKeyPattern     = "flash_item:%s:reserved"
+	UserKeyPattern         = "flash_item:%s:user:%s"
+	IdempotencyUserPattern = "flash_item:%s:idempotency:%s:%s"
+	ReservationPattern     = "flash_item:%s:reservation:%s"
 )
 
-func StockKey(itemID string) string        { return fmt.Sprintf(StockKeyPattern, itemID) }
-func ReservedKey(itemID string) string     { return fmt.Sprintf(ReservedKeyPattern, itemID) }
-func UserKey(itemID, userID string) string { return fmt.Sprintf(UserKeyPattern, itemID, userID) }
-func EventMetaKey(eventID string) string   { return fmt.Sprintf(EventMetaPattern, eventID) }
-func IdempotencyKey(key string) string     { return fmt.Sprintf(IdempotencyPattern, key) }
+func StockKey(item string) string      { return fmt.Sprintf(StockKeyPattern, item) }
+func ReservedKey(item string) string   { return fmt.Sprintf(ReservedKeyPattern, item) }
+func UserKey(item, user string) string { return fmt.Sprintf(UserKeyPattern, item, user) }
+func IdempotencyUserKey(item, user, key string) string {
+	return fmt.Sprintf(IdempotencyUserPattern, item, user, key)
+}
+func ReservationKey(item, reservation string) string {
+	return fmt.Sprintf(ReservationPattern, item, reservation)
+}
