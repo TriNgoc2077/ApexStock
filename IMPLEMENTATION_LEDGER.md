@@ -7,13 +7,13 @@
 
 ## 1. Trạng thái thực thi hiện tại (Current Execution State)
 
-- **Overall Status:** `IN_PROGRESS`
-- **Current Stage:** `Stage 13`
+- **Overall Status:** `COMPLETED`
+- **Current Stage:** `Stage 13 (All Stages Complete)`
 - **Execution Mode:** `SEQUENTIAL` — một orchestrator duy nhất, chạy Stage 1 → Stage 13, mỗi lần một subagent
-- **Current Phase:** `IMPLEMENT` (`READY` | `IMPLEMENT` | `CHECKPOINT_COMMITTED` | `REVIEW_ROUND_1` | `REVIEW_ROUND_2` | `VERIFY` | `COMMITTED`)
+- **Current Phase:** `COMMITTED` (`READY` | `IMPLEMENT` | `CHECKPOINT_COMMITTED` | `REVIEW_ROUND_1` | `REVIEW_ROUND_2` | `VERIFY` | `COMMITTED`)
 - **Base Commit SHA:** `91ce71c` (stage-0)
-- **Last Completed Stage:** `Stage 12`
-- **Last Completed Commit SHA:** `6a26b76`
+- **Last Completed Stage:** `Stage 13`
+- **Last Completed Commit SHA:** `56e8ff7`
 
 ---
 
@@ -56,7 +56,7 @@
 | **10** | QA test pyramid, concurrency & invariant verifier | Stage 3–9 | `qa-loadtest` | `backend-core` | `code-reviewer` | `COMPLETED` | 0 | `c5f25b5` |
 | **11** | k6 benchmark & fair comparison | Stage 7, 10 | `qa-loadtest` | `infra-devops` | `code-reviewer` | `COMPLETED` | 0 | `8e9186f` |
 | **12** | Chaos, resilience, soak & system testing | Stage 7, 9, 10, 11 | `qa-loadtest` | `observability-reliability`, `infra-devops` | `code-reviewer` | `COMPLETED` | 0 | `6a26b76` |
-| **13** | Demo hardening, evidence pack & context handoff | Stage 11, 12 | `qa-loadtest` | `infra-devops`, `observability-reliability` | `code-reviewer` | `IN_PROGRESS` | 0 | - |
+| **13** | Demo hardening, evidence pack & context handoff | Stage 11, 12 | `qa-loadtest` | `infra-devops`, `observability-reliability` | `code-reviewer` | `COMPLETED` | 0 | `56e8ff7` |
 
 ---
 
@@ -413,3 +413,31 @@ go test -count=1 -race ./...                    # PASS
 - ✅ Chaos scripts guarantee automatic cleanup via signal traps
 
 **Commit SHA:** `6a26b76`
+
+
+### Stage 13: Demo hardening, evidence pack & context handoff
+
+**Phase:** COMMITTED  
+**Primary Agent:** qa-loadtest  
+**Deliverables:**
+- Demo Day Runbook (`docs/runbooks/demo-day.md`), Full Rehearsal Script (`scripts/demo/rehearsal.sh`), and Known Limitations Register (`docs/known-limitations.md`)
+- Evidence pack directory skeleton (`docs/benchmark/results/.gitkeep`, `loadtests/results/.gitkeep`)
+- Comprehensive One-Command Quickstart (`README.md`) and Context Handoff Guide (`docs/handoff.md`) summarizing D0.1–D0.15, service ports, verification commands, and maintenance procedures
+
+**Verification:**
+```bash
+bash -n scripts/demo/rehearsal.sh  # PASS
+go build ./...                     # PASS
+go vet ./...                       # PASS
+go test -count=1 -race ./...       # PASS
+cd web && npm run build            # PASS
+docker compose -f deploy/compose/docker-compose.yaml config -q  # PASS
+```
+
+**Acceptance:**
+- ✅ One-command startup, seed, smoke, and reset documented in `README.md`
+- ✅ Hypothesis targets clearly distinguished from empirical run artifacts (D0.10)
+- ✅ Zero secrets or exposed Docker sockets in default profiles (D0.6, D0.12)
+- ✅ Full context handoff in `docs/handoff.md`
+
+**Commit SHA:** `56e8ff7`
