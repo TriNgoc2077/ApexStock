@@ -8,12 +8,12 @@
 ## 1. Trạng thái thực thi hiện tại (Current Execution State)
 
 - **Overall Status:** `IN_PROGRESS`
-- **Current Stage:** `Stage 5`
+- **Current Stage:** `Stage 6`
 - **Execution Mode:** `SEQUENTIAL` — một orchestrator duy nhất, chạy Stage 1 → Stage 13, mỗi lần một subagent
 - **Current Phase:** `IMPLEMENT` (`READY` | `IMPLEMENT` | `CHECKPOINT_COMMITTED` | `REVIEW_ROUND_1` | `REVIEW_ROUND_2` | `VERIFY` | `COMMITTED`)
 - **Base Commit SHA:** `91ce71c` (stage-0)
-- **Last Completed Stage:** `Stage 4`
-- **Last Completed Commit SHA:** `a914a16`
+- **Last Completed Stage:** `Stage 5`
+- **Last Completed Commit SHA:** `a2b6053`
 
 ---
 
@@ -48,8 +48,8 @@
 | **2** | PostgreSQL migration, Redis keyspace & seed/reset | Stage 1 | `backend-core` | `infra-devops` | `code-reviewer` | `COMPLETED` | 1 | `bc2ba07` |
 | **3** | Baseline order vertical slice | Stage 2 | `backend-core` | - | `code-reviewer` | `COMPLETED` | 1 | `820b61c` |
 | **4** | Optimized reservation, idempotency, NATS & worker | Stage 2, 3 | `backend-core` | `infra-devops` | `code-reviewer` | `COMPLETED` | 0 | `a914a16` |
-| **5** | Payment simulator, confirm/fail/timeout/cancel & restock | Stage 3, 4 | `backend-core` | `payment-integrations` | `code-reviewer` | `IN_PROGRESS` | 0 | - |
-| **6** | SePay adapter thật cho UI | Stage 5 | `payment-integrations` | `backend-core` | `code-reviewer` | `PENDING` | 0 | - |
+| **5** | Payment simulator, confirm/fail/timeout/cancel & restock | Stage 3, 4 | `backend-core` | `payment-integrations` | `code-reviewer` | `COMPLETED` | 1 | `a2b6053` |
+| **6** | SePay adapter thật cho UI | Stage 5 | `payment-integrations` | `backend-core` | `code-reviewer` | `IN_PROGRESS` | 0 | - |
 | **7** | Observability, metrics, logs & reliability baseline | Stage 3, 4, 5 | `observability-reliability` | `backend-core`, `infra-devops` | `code-reviewer` | `PENDING` | 0 | - |
 | **8** | Frontend product flow & design system | Stage 5 | `frontend-ui` | - | `code-reviewer` | `PENDING` | 0 | - |
 | **9** | War Room dashboard & chaos controller | Stage 7, 8 | `frontend-ui` | `backend-core`, `infra-devops` | `code-reviewer` | `PENDING` | 0 | - |
@@ -197,3 +197,33 @@ go test -count=1 -race ./...    # PASS
 - ✅ Reconciliation verifier checks stock equation
 
 **Commit SHA:** `a914a16`
+
+
+### Stage 5: Payment simulator, confirm/fail/timeout/cancel & restock
+
+**Phase:** COMMITTED  
+**Primary Agent:** backend-core  
+**Deliverables:**
+- Shared payment domain DTOs (`SimulatePaymentRequest`, `PaymentResultResponse`) and state machine (`EvaluateTransition`) enforcing valid transitions and D0.7 late-payment refund auditing (`webhook_logs.status='refund'`)
+- Baseline (`BaselineService`) and Optimized (`OptimizedService`) payment processors with row locking, Redis Lua `Confirm`/`Release` idempotency, and atomic `sold_quantity` restock/confirmation
+- Payment Simulator engine (`Simulator`) with configurable ratio distributions and deterministic overrides
+- Expiry sweeper (`ExpirySweeper`) and scheduler daemon (`cmd/scheduler/main.go`)
+- Shared `POST /api/v1/payments/simulate` endpoint on both Baseline (`:8081`) and Optimized (`:8082`)
+- Concurrency stress tests (`TestConcurrency_ConfirmVsCancelVsExpireRace` on Baseline and Optimized) and post-run SQL reconciliation pass
+
+**Verification:**
+```bash
+go build ./...                  # PASS
+go vet ./...                    # PASS
+go test -count=1 -race ./...    # PASS
+bash scripts/reconcile.sql.sh   # PASS
+```
+
+**Acceptance:**
+- ✅ Configurable & deterministic simulator ratios
+- ✅ Each terminal outcome applies at most once (Invariant I2/I4)
+- ✅ Payment failure/timeout/cancel restores stock exactly once
+- ✅ Late payment after expiry keeps order `expired` and records `webhook_logs` status `refund` (D0.7)
+- ✅ Post-run reconciliation passes
+
+**Commit SHA:** `a2b6053`
