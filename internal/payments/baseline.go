@@ -60,11 +60,11 @@ func (s *BaselineService) Process(ctx context.Context, req ProcessPaymentRequest
 	// Decision Gate D0.7: late payment on expired order
 	if errors.Is(evalErr, ErrOrderExpiredRefund) {
 		payload, _ := json.Marshal(map[string]any{
-			"order_id":        req.OrderID,
-			"outcome":         req.Outcome,
-			"provider_tx_id":  req.ProviderTxID,
-			"reason":          "payment arrived after order expired",
-			"received_at":     time.Now().UTC(),
+			"order_id":       req.OrderID,
+			"outcome":        req.Outcome,
+			"provider_tx_id": req.ProviderTxID,
+			"reason":         "payment arrived after order expired",
+			"received_at":    time.Now().UTC(),
 		})
 		_, logErr := tx.ExecContext(ctx, `
 			INSERT INTO webhook_logs (order_id, provider, transaction_ref, status, payload)
