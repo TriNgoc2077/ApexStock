@@ -6,6 +6,7 @@ import (
 	"apexstock/internal/messaging"
 	"apexstock/internal/optimized"
 	"apexstock/internal/payments"
+	"apexstock/internal/payments/sepay"
 	"database/sql"
 	"fmt"
 	_ "github.com/lib/pq"
@@ -38,6 +39,14 @@ func main() {
 	paymentSvc := payments.NewOptimizedService(db, rdb)
 	paymentSim := payments.NewSimulator(paymentSvc, payments.DefaultSimulatorConfig())
 	mux.Handle("POST /api/v1/payments/simulate", httpapi.SimulatePaymentHandler(paymentSim))
+
+	// Mount SePay adapter and endpoints
+	sepayCfg := sepay.LoadConfigFromEnv()
+	sepayAdapter := sepay.NewAdapter(sepayCfg)
+	sepayHandler := httpapi.NewSepayWebhookHandler(sepayAdapter, paymentSvc, db)
+
+	mux.HandleFunc("POST /api/v1/payments/sepay/initiate", sepayHandler.HandleInitiate)
+	mux.HandleFunc("POST /api/v1/webhooks/sepay", sepayHandler.HandleWebhook)
 	srv := &http.Server{Addr: fmt.Sprintf(":%d", cfg.OptimizedPort), Handler: mux, ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 15 * time.Second, WriteTimeout: 15 * time.Second, IdleTimeout: 60 * time.Second}
 	log.Printf("[api-optimized] Starting on %s", srv.Addr)
 	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {

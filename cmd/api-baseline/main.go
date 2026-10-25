@@ -13,6 +13,7 @@ import (
 	"apexstock/internal/domain"
 	"apexstock/internal/httpapi"
 	"apexstock/internal/payments"
+	"apexstock/internal/payments/sepay"
 
 	_ "github.com/lib/pq"
 )
@@ -43,6 +44,14 @@ func main() {
 	paymentSvc := payments.NewBaselineService(db)
 	paymentSim := payments.NewSimulator(paymentSvc, payments.DefaultSimulatorConfig())
 	mux.Handle("POST /api/v1/payments/simulate", httpapi.SimulatePaymentHandler(paymentSim))
+
+	// Mount SePay adapter and endpoints
+	sepayCfg := sepay.LoadConfigFromEnv()
+	sepayAdapter := sepay.NewAdapter(sepayCfg)
+	sepayHandler := httpapi.NewSepayWebhookHandler(sepayAdapter, paymentSvc, db)
+
+	mux.HandleFunc("POST /api/v1/payments/sepay/initiate", sepayHandler.HandleInitiate)
+	mux.HandleFunc("POST /api/v1/webhooks/sepay", sepayHandler.HandleWebhook)
 
 	addr := fmt.Sprintf(":%d", cfg.BaselinePort)
 	log.Printf("[api-baseline] Starting on %s", addr)
