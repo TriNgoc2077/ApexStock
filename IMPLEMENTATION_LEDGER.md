@@ -8,12 +8,12 @@
 ## 1. Trạng thái thực thi hiện tại (Current Execution State)
 
 - **Overall Status:** `IN_PROGRESS`
-- **Current Stage:** `Stage 8`
+- **Current Stage:** `Stage 9`
 - **Execution Mode:** `SEQUENTIAL` — một orchestrator duy nhất, chạy Stage 1 → Stage 13, mỗi lần một subagent
 - **Current Phase:** `IMPLEMENT` (`READY` | `IMPLEMENT` | `CHECKPOINT_COMMITTED` | `REVIEW_ROUND_1` | `REVIEW_ROUND_2` | `VERIFY` | `COMMITTED`)
 - **Base Commit SHA:** `91ce71c` (stage-0)
-- **Last Completed Stage:** `Stage 7`
-- **Last Completed Commit SHA:** `627f740`
+- **Last Completed Stage:** `Stage 8`
+- **Last Completed Commit SHA:** `85d25ad`
 
 ---
 
@@ -51,8 +51,8 @@
 | **5** | Payment simulator, confirm/fail/timeout/cancel & restock | Stage 3, 4 | `backend-core` | `payment-integrations` | `code-reviewer` | `COMPLETED` | 1 | `a2b6053` |
 | **6** | SePay adapter thật cho UI | Stage 5 | `payment-integrations` | `backend-core` | `code-reviewer` | `COMPLETED` | 0 | `f2a25ba` |
 | **7** | Observability, metrics, logs & reliability baseline | Stage 3, 4, 5 | `observability-reliability` | `backend-core`, `infra-devops` | `code-reviewer` | `COMPLETED` | 0 | `627f740` |
-| **8** | Frontend product flow & design system | Stage 5 | `frontend-ui` | - | `code-reviewer` | `IN_PROGRESS` | 0 | - |
-| **9** | War Room dashboard & chaos controller | Stage 7, 8 | `frontend-ui` | `backend-core`, `infra-devops` | `code-reviewer` | `PENDING` | 0 | - |
+| **8** | Frontend product flow & design system | Stage 5 | `frontend-ui` | - | `code-reviewer` | `COMPLETED` | 1 | `85d25ad` |
+| **9** | War Room dashboard & chaos controller | Stage 7, 8 | `frontend-ui` | `backend-core`, `infra-devops` | `code-reviewer` | `IN_PROGRESS` | 0 | - |
 | **10** | QA test pyramid, concurrency & invariant verifier | Stage 3–9 | `qa-loadtest` | `backend-core` | `code-reviewer` | `PENDING` | 0 | - |
 | **11** | k6 benchmark & fair comparison | Stage 7, 10 | `qa-loadtest` | `infra-devops` | `code-reviewer` | `PENDING` | 0 | - |
 | **12** | Chaos, resilience, soak & system testing | Stage 7, 9, 10, 11 | `qa-loadtest` | `observability-reliability`, `infra-devops` | `code-reviewer` | `PENDING` | 0 | - |
@@ -281,3 +281,31 @@ go test -count=1 -race ./...    # PASS
 - ✅ Grafana dashboard & Prometheus alert rules provisioned
 
 **Commit SHA:** `627f740`
+
+
+### Stage 8: Frontend product flow & design system
+
+**Phase:** COMMITTED  
+**Primary Agent:** frontend-ui  
+**Deliverables:**
+- Backend Catalog & Order Read APIs (`internal/httpapi/catalog_handler.go`: `GET /api/v1/flash-sale/events`, `GET /api/v1/flash-sale/items/{id}`, `GET /api/v1/orders/{id}`) mounted on Baseline and Optimized APIs, plus CORS preflight and route normalization in `internal/observability/middleware.go`
+- Design system tokens (dark/light theme, `prefers-reduced-motion` support) and animated primitives (`ThemeToggle.tsx`, `AuroraHero.tsx`, `SpotlightCard.tsx` using CSS custom properties without React rerender)
+- Typed API client (`web/src/lib/api.ts`) with deterministic idempotency key store and visibility-aware polling hook (`web/src/hooks/usePolling.ts`)
+- Product flow routes (`web/src/app/page.tsx`, `web/src/app/flash-sale/[id]/page.tsx`, `web/src/app/orders/[id]/page.tsx`) supporting Baseline vs Optimized architecture selector, SePay QR generation, and simulator payment triggers
+
+**Verification:**
+```bash
+go build ./...                  # PASS
+go vet ./...                    # PASS
+go test -count=1 -race ./...    # PASS
+cd web && npm run lint          # PASS
+cd web && npm run build         # PASS
+```
+
+**Acceptance:**
+- ✅ End-to-end user demo flow from flash sale catalog → item detail → order → payment QR / simulator → live polling status
+- ✅ Duplicate click prevention via deterministic idempotency key store
+- ✅ Stale/disconnect indicator, theme toggle, reduced-motion, and keyboard navigation
+- ✅ Next.js App Router `[id]` segments and polling per D0.14
+
+**Commit SHA:** `85d25ad`
