@@ -41,6 +41,12 @@ func main() {
 		return service.Create(ctx, req)
 	}))
 
+	// Catalog & Order read endpoints
+	catalogHandler := httpapi.NewCatalogHandler(db, nil)
+	mux.HandleFunc("GET /api/v1/flash-sale/events", catalogHandler.ListActiveEvents)
+	mux.HandleFunc("GET /api/v1/flash-sale/items/", catalogHandler.GetItemDetail)
+	mux.HandleFunc("GET /api/v1/orders/", catalogHandler.GetOrderDetail)
+
 	// Payment simulation endpoint
 	paymentSvc := payments.NewBaselineService(db)
 	paymentSim := payments.NewSimulator(paymentSvc, payments.DefaultSimulatorConfig())

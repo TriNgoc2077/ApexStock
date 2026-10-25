@@ -37,6 +37,12 @@ func main() {
 	mux.HandleFunc("/healthz", httpapi.HealthzHandler)
 	mux.HandleFunc("/readyz", func(w http.ResponseWriter, r *http.Request) { httpapi.ReadyzHandler(w, r, cfg.OptimizedDSN) })
 	mux.Handle("POST /api/v1/flash-sale/orders", httpapi.OptimizedOrderHandler(svc.Create))
+
+	// Catalog & Order read endpoints
+	catalogHandler := httpapi.NewCatalogHandler(db, rdb)
+	mux.HandleFunc("GET /api/v1/flash-sale/events", catalogHandler.ListActiveEvents)
+	mux.HandleFunc("GET /api/v1/flash-sale/items/", catalogHandler.GetItemDetail)
+	mux.HandleFunc("GET /api/v1/orders/", catalogHandler.GetOrderDetail)
 	paymentSvc := payments.NewOptimizedService(db, rdb)
 	paymentSim := payments.NewSimulator(paymentSvc, payments.DefaultSimulatorConfig())
 	mux.Handle("POST /api/v1/payments/simulate", httpapi.SimulatePaymentHandler(paymentSim))
