@@ -4,6 +4,7 @@ import (
 	"apexstock/internal/config"
 	"apexstock/internal/httpapi"
 	"apexstock/internal/messaging"
+	"apexstock/internal/observability"
 	"apexstock/internal/optimized"
 	"apexstock/internal/payments"
 	"apexstock/internal/payments/sepay"
@@ -47,7 +48,20 @@ func main() {
 
 	mux.HandleFunc("POST /api/v1/payments/sepay/initiate", sepayHandler.HandleInitiate)
 	mux.HandleFunc("POST /api/v1/webhooks/sepay", sepayHandler.HandleWebhook)
-	srv := &http.Server{Addr: fmt.Sprintf(":%d", cfg.OptimizedPort), Handler: mux, ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 15 * time.Second, WriteTimeout: 15 * time.Second, IdleTimeout: 60 * time.Second}
+
+	// Observability: initialize structured JSON logger and metrics endpoint
+	observability.InitLogger(cfg.Environment)
+	mux.HandleFunc("/metrics", observability.MetricsHandler())
+
+	handler := observability.HTTPMiddleware("optimized", mux)
+	srv := &http.Server{
+		Addr:              fmt.Sprintf(":%d", cfg.OptimizedPort),
+		Handler:           handler,
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       15 * time.Second,
+		WriteTimeout:      15 * time.Second,
+		IdleTimeout:       60 * time.Second,
+	}
 	log.Printf("[api-optimized] Starting on %s", srv.Addr)
 	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		log.Fatal(err)

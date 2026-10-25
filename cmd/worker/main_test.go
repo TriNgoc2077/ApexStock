@@ -2,12 +2,34 @@ package main
 
 import (
 	"context"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
 	"apexstock/internal/messaging"
+	"apexstock/internal/observability"
 	"apexstock/internal/optimized"
 )
+
+func TestWorker_MetricsServerResponds(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/metrics", observability.MetricsHandler())
+	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+
+	resp, err := http.Get(srv.URL + "/metrics")
+	if err != nil {
+		t.Fatalf("failed to query worker /metrics: %v", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200 OK from worker /metrics, got %d", resp.StatusCode)
+	}
+}
 
 func TestWorker_ContextCancellation(t *testing.T) {
 	// Verify that Worker.Run exits cleanly when context is cancelled
