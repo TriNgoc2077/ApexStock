@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -100,12 +101,27 @@ func (s *WarRoomService) Start(ctx context.Context) {
 	}
 }
 
+func computeRPS(telem *ArchitectureTelemetry, state *instanceState, now time.Time) {
+	totalReqs := telem.Status2xx + telem.Status409 + telem.Status429 + telem.Status5xx
+	if !state.prevReqTime.IsZero() && totalReqs >= state.prevReqs {
+		elapsed := now.Sub(state.prevReqTime).Seconds()
+		if elapsed > 0 {
+			telem.RPS = float64(totalReqs-state.prevReqs) / elapsed
+		}
+	}
+	state.prevReqs = totalReqs
+	state.prevReqTime = now
+}
+
 func (s *WarRoomService) tick(ctx context.Context) {
 	baseTelem := s.pollInstance(ctx, "baseline", s.baselineURL)
 	optTelem := s.pollInstance(ctx, "optimized", s.optimizedURL)
 
 	s.mu.Lock()
 	now := time.Now().UTC()
+
+	computeRPS(&baseTelem, &s.baseState, now)
+	computeRPS(&optTelem, &s.optState, now)
 
 	// Detect state transitions and calculate recovery times
 	s.evaluateTransition("Baseline (:8081)", &s.baseState, baseTelem.Status, now)
@@ -114,7 +130,7 @@ func (s *WarRoomService) tick(ctx context.Context) {
 	s.snapshot.Timestamp = now
 	s.snapshot.Baseline = baseTelem
 	s.snapshot.Optimized = optTelem
-	currentSnap := s.snapshot
+	currentSnap := s.cloneSnapshotLocked()
 	s.mu.Unlock()
 
 	// Broadcast to all active SSE/WebSocket subscribers
@@ -184,6 +200,9 @@ func (s *WarRoomService) pollInstance(ctx context.Context, arch, baseURL string)
 }
 
 func (s *WarRoomService) parsePrometheusMetrics(r io.Reader, telem *ArchitectureTelemetry) {
+	bucketCounts := make(map[float64]uint64)
+	var infCount uint64
+
 	scanner := bufio.NewScanner(r)
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
@@ -211,13 +230,71 @@ func (s *WarRoomService) parsePrometheusMetrics(r io.Reader, telem *Architecture
 				telem.Status5xx += val
 			}
 
+		case strings.HasPrefix(metricWithLabels, "http_request_duration_seconds_bucket"):
+			val, _ := strconv.ParseUint(valStr, 10, 64)
+			leIdx := strings.Index(metricWithLabels, `le="`)
+			if leIdx != -1 {
+				start := leIdx + 4
+				end := strings.Index(metricWithLabels[start:], `"`)
+				if end != -1 {
+					leVal := metricWithLabels[start : start+end]
+					if leVal == "+Inf" {
+						infCount += val
+					} else if bound, err := strconv.ParseFloat(leVal, 64); err == nil {
+						bucketCounts[bound] += val
+					}
+				}
+			}
+
 		case strings.HasPrefix(metricWithLabels, "stock_remaining"):
-			val, _ := strconv.ParseInt(valStr, 10, 64)
-			telem.RemainingStock = val
+			val, err := strconv.ParseFloat(valStr, 64)
+			if err == nil {
+				telem.RemainingStock = int64(val)
+			}
 
 		case strings.HasPrefix(metricWithLabels, "oversell_total"):
 			val, _ := strconv.ParseUint(valStr, 10, 64)
 			telem.OversellCount += val
+		}
+	}
+
+	// Compute histogram quantiles in milliseconds (seconds * 1000)
+	if len(bucketCounts) > 0 {
+		bounds := make([]float64, 0, len(bucketCounts))
+		for b := range bucketCounts {
+			bounds = append(bounds, b)
+		}
+		sort.Float64s(bounds)
+
+		totalCount := infCount
+		if totalCount == 0 {
+			totalCount = bucketCounts[bounds[len(bounds)-1]]
+		}
+
+		if totalCount > 0 {
+			calcQuantile := func(q float64) float64 {
+				rank := q * float64(totalCount)
+				var prevBound float64
+				var prevCount uint64
+				for _, b := range bounds {
+					c := bucketCounts[b]
+					if float64(c) >= rank {
+						bucketDelta := float64(c - prevCount)
+						if bucketDelta > 0 {
+							fraction := (rank - float64(prevCount)) / bucketDelta
+							return (prevBound + (b-prevBound)*fraction) * 1000.0
+						}
+						return b * 1000.0
+					}
+					prevBound = b
+					prevCount = c
+				}
+				return bounds[len(bounds)-1] * 1000.0
+			}
+
+			telem.P50LatencyMs = calcQuantile(0.50)
+			telem.P95LatencyMs = calcQuantile(0.95)
+			telem.P99LatencyMs = calcQuantile(0.99)
 		}
 	}
 }
@@ -243,10 +320,18 @@ func (s *WarRoomService) appendActivityLog(logType, message string, recTime *int
 	s.appendActivityLogLocked(logType, message, recTime)
 }
 
+func (s *WarRoomService) cloneSnapshotLocked() WarRoomSnapshot {
+	snap := s.snapshot
+	if len(s.snapshot.ActivityLogs) > 0 {
+		snap.ActivityLogs = append([]ActivityLogEntry(nil), s.snapshot.ActivityLogs...)
+	}
+	return snap
+}
+
 func (s *WarRoomService) GetSnapshot() WarRoomSnapshot {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return s.snapshot
+	return s.cloneSnapshotLocked()
 }
 
 func (s *WarRoomService) SetRunState(state string, isBenchmark bool, runID string) {

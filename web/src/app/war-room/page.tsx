@@ -27,7 +27,8 @@ export default function WarRoomPage() {
 
   useEffect(() => {
     let eventSource: EventSource | null = null;
-    let staleTimer: NodeJS.Timeout;
+    let staleTimer: NodeJS.Timeout | null = null;
+    let reconnectTimer: NodeJS.Timeout | null = null;
 
     const connect = () => {
       eventSource = new EventSource('http://localhost:9000/api/v1/warroom/stream');
@@ -44,7 +45,7 @@ export default function WarRoomPage() {
           setIsRunning(data.run_state.startsWith('running'));
           setIsStale(false);
 
-          clearTimeout(staleTimer);
+          if (staleTimer) clearTimeout(staleTimer);
           staleTimer = setTimeout(() => setIsStale(true), 3000);
         } catch {
           // Ignore parse errors on heartbeat comments
@@ -55,7 +56,8 @@ export default function WarRoomPage() {
         setConnected(false);
         setIsStale(true);
         eventSource?.close();
-        setTimeout(connect, 2000);
+        if (reconnectTimer) clearTimeout(reconnectTimer);
+        reconnectTimer = setTimeout(connect, 2000);
       };
     };
 
@@ -63,7 +65,8 @@ export default function WarRoomPage() {
 
     return () => {
       eventSource?.close();
-      clearTimeout(staleTimer);
+      if (staleTimer) clearTimeout(staleTimer);
+      if (reconnectTimer) clearTimeout(reconnectTimer);
     };
   }, []);
 

@@ -5,12 +5,26 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 )
 
 func TestMetricsAggregator_ParsesPrometheusMetrics(t *testing.T) {
+	sampleMetricsFirst := `# HELP http_requests_total Total
+# TYPE http_requests_total counter
+http_requests_total{arch="optimized",method="POST",route="/orders",status="201"} 100
+# HELP http_request_duration_seconds Latency
+# TYPE http_request_duration_seconds histogram
+http_request_duration_seconds_bucket{arch="optimized",route="/orders",le="0.01"} 60
+http_request_duration_seconds_bucket{arch="optimized",route="/orders",le="0.05"} 90
+http_request_duration_seconds_bucket{arch="optimized",route="/orders",le="+Inf"} 100
+# HELP stock_remaining Remaining
+# TYPE stock_remaining gauge
+stock_remaining{arch="optimized",item_id="item-1"} 900
+`
+
 	sampleMetrics := `# HELP http_requests_total Total
 # TYPE http_requests_total counter
 http_requests_total{arch="optimized",method="POST",route="/orders",status="201"} 150
@@ -31,6 +45,7 @@ stock_remaining{arch="optimized",item_id="item-1"} 850
 oversell_total{item_id="item-1"} 0
 `
 
+	var pollCount atomic.Int64
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/healthz" {
 			w.WriteHeader(http.StatusOK)
@@ -39,15 +54,29 @@ oversell_total{item_id="item-1"} 0
 		}
 		if r.URL.Path == "/metrics" {
 			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(sampleMetrics))
+			if pollCount.Add(1) == 1 {
+				_, _ = w.Write([]byte(sampleMetricsFirst))
+			} else {
+				_, _ = w.Write([]byte(sampleMetrics))
+			}
 			return
 		}
 		w.WriteHeader(http.StatusNotFound)
 	}))
 	defer ts.Close()
 
-	svc := NewWarRoomService(ts.URL, ts.URL)
-	snap := svc.pollInstance(context.Background(), "optimized", ts.URL)
+	svc := NewWarRoomService("http://127.0.0.1:0", ts.URL)
+	ctx := context.Background()
+
+	// First tick initializes baseline request count and timestamp
+	svc.tick(ctx)
+
+	// Sleep briefly so elapsed time > 0
+	time.Sleep(15 * time.Millisecond)
+
+	// Second tick calculates non-zero RPS and parses updated metrics
+	svc.tick(ctx)
+	snap := svc.GetSnapshot().Optimized
 
 	if !snap.Healthy {
 		t.Fatalf("expected healthy = true")
@@ -67,6 +96,18 @@ oversell_total{item_id="item-1"} 0
 	if snap.OversellCount != 0 {
 		t.Errorf("expected OversellCount = 0, got %d", snap.OversellCount)
 	}
+	if snap.P50LatencyMs <= 0 {
+		t.Errorf("expected P50LatencyMs > 0, got %f", snap.P50LatencyMs)
+	}
+	if snap.P95LatencyMs <= 0 {
+		t.Errorf("expected P95LatencyMs > 0, got %f", snap.P95LatencyMs)
+	}
+	if snap.P99LatencyMs <= 0 {
+		t.Errorf("expected P99LatencyMs > 0, got %f", snap.P99LatencyMs)
+	}
+	if snap.RPS <= 0 {
+		t.Errorf("expected RPS > 0, got %f", snap.RPS)
+	}
 }
 
 func TestHealthWatcher_MeasuresRecoveryTime(t *testing.T) {
@@ -82,7 +123,7 @@ func TestHealthWatcher_MeasuresRecoveryTime(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	svc := NewWarRoomService(ts.URL, ts.URL)
+	svc := NewWarRoomService("http://127.0.0.1:0", ts.URL)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -133,4 +174,47 @@ func TestMetricsAggregator_BoundedMemory_SlidingWindow(t *testing.T) {
 	if len(snap.ActivityLogs) > 100 {
 		t.Fatalf("activity logs exceeded max capacity (got %d, max 100)", len(snap.ActivityLogs))
 	}
+}
+
+func TestSnapshot_ActivityLogsClone_RaceFree(t *testing.T) {
+	svc := NewWarRoomService("http://localhost:8081", "http://localhost:8082")
+
+	var wg sync.WaitGroup
+	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+	defer cancel()
+
+	// Goroutine 1: Rapidly writes logs
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		i := 0
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			default:
+				i++
+				svc.appendActivityLog("info", fmt.Sprintf("Log %d", i), nil)
+			}
+		}
+	}()
+
+	// Goroutine 2: Rapidly reads snapshots and inspects ActivityLogs
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			default:
+				snap := svc.GetSnapshot()
+				for _, l := range snap.ActivityLogs {
+					_ = l.Message
+				}
+			}
+		}
+	}()
+
+	wg.Wait()
 }
