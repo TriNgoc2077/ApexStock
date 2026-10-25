@@ -2,6 +2,7 @@ package optimized
 
 import (
 	"context"
+	"crypto/rand"
 	"crypto/sha256"
 	"database/sql"
 	"encoding/hex"
@@ -114,5 +115,12 @@ func atoi64(v interface{}) int64   { n, _ := strconv.ParseInt(fmt.Sprint(v), 10,
 func atoi32(v interface{}) int32   { return int32(atoi64(v)) }
 func parseTime(v string) time.Time { t, _ := time.Parse(time.RFC3339Nano, v); return t }
 func newID() string {
-	return fmt.Sprintf("%08x-%04x-4%03x-8%03x-%012x", time.Now().UnixNano()>>32, time.Now().UnixNano()&65535, time.Now().UnixNano()&4095, time.Now().UnixNano()&4095, time.Now().UnixNano())
+	var b [16]byte
+	if _, err := rand.Read(b[:]); err != nil {
+		// Fallback safe formatting
+		return fmt.Sprintf("%08x-%04x-4000-8000-%012x", time.Now().UnixNano()>>32, time.Now().UnixNano()&65535, time.Now().UnixNano()&0xffffffffffff)
+	}
+	b[6] = (b[6] & 0x0f) | 0x40 // Version 4
+	b[8] = (b[8] & 0x3f) | 0x80 // Variant RFC 4122
+	return fmt.Sprintf("%08x-%04x-%04x-%04x-%012x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:16])
 }
