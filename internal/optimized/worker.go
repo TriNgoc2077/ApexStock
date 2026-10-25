@@ -73,7 +73,7 @@ func (w *Worker) process(ctx context.Context, msg *nats.Msg) error {
 	if err != nil {
 		return err
 	}
-	_, err = tx.ExecContext(ctx, `INSERT INTO payments(order_id,method,amount,status) VALUES($1,'simulated',$2,'pending') ON CONFLICT (order_id) DO NOTHING`, e.OrderID, e.TotalAmount)
+	_, err = tx.ExecContext(ctx, `INSERT INTO payments(order_id,method,amount,status) VALUES($1,'simulated',$2,'pending')`, e.OrderID, e.TotalAmount)
 	if err != nil {
 		return err
 	}
