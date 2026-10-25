@@ -8,12 +8,12 @@
 ## 1. Trạng thái thực thi hiện tại (Current Execution State)
 
 - **Overall Status:** `IN_PROGRESS`
-- **Current Stage:** `Stage 7`
+- **Current Stage:** `Stage 8`
 - **Execution Mode:** `SEQUENTIAL` — một orchestrator duy nhất, chạy Stage 1 → Stage 13, mỗi lần một subagent
 - **Current Phase:** `IMPLEMENT` (`READY` | `IMPLEMENT` | `CHECKPOINT_COMMITTED` | `REVIEW_ROUND_1` | `REVIEW_ROUND_2` | `VERIFY` | `COMMITTED`)
 - **Base Commit SHA:** `91ce71c` (stage-0)
-- **Last Completed Stage:** `Stage 6`
-- **Last Completed Commit SHA:** `f2a25ba`
+- **Last Completed Stage:** `Stage 7`
+- **Last Completed Commit SHA:** `627f740`
 
 ---
 
@@ -50,8 +50,8 @@
 | **4** | Optimized reservation, idempotency, NATS & worker | Stage 2, 3 | `backend-core` | `infra-devops` | `code-reviewer` | `COMPLETED` | 0 | `a914a16` |
 | **5** | Payment simulator, confirm/fail/timeout/cancel & restock | Stage 3, 4 | `backend-core` | `payment-integrations` | `code-reviewer` | `COMPLETED` | 1 | `a2b6053` |
 | **6** | SePay adapter thật cho UI | Stage 5 | `payment-integrations` | `backend-core` | `code-reviewer` | `COMPLETED` | 0 | `f2a25ba` |
-| **7** | Observability, metrics, logs & reliability baseline | Stage 3, 4, 5 | `observability-reliability` | `backend-core`, `infra-devops` | `code-reviewer` | `IN_PROGRESS` | 0 | - |
-| **8** | Frontend product flow & design system | Stage 5 | `frontend-ui` | - | `code-reviewer` | `PENDING` | 0 | - |
+| **7** | Observability, metrics, logs & reliability baseline | Stage 3, 4, 5 | `observability-reliability` | `backend-core`, `infra-devops` | `code-reviewer` | `COMPLETED` | 0 | `627f740` |
+| **8** | Frontend product flow & design system | Stage 5 | `frontend-ui` | - | `code-reviewer` | `IN_PROGRESS` | 0 | - |
 | **9** | War Room dashboard & chaos controller | Stage 7, 8 | `frontend-ui` | `backend-core`, `infra-devops` | `code-reviewer` | `PENDING` | 0 | - |
 | **10** | QA test pyramid, concurrency & invariant verifier | Stage 3–9 | `qa-loadtest` | `backend-core` | `code-reviewer` | `PENDING` | 0 | - |
 | **11** | k6 benchmark & fair comparison | Stage 7, 10 | `qa-loadtest` | `infra-devops` | `code-reviewer` | `PENDING` | 0 | - |
@@ -254,3 +254,30 @@ go test -count=1 -race ./...    # PASS
 - ✅ Late payment after expiry follows D0.7 refund policy
 
 **Commit SHA:** `f2a25ba`
+
+
+### Stage 7: Observability, metrics, logs & reliability baseline
+
+**Phase:** COMMITTED  
+**Primary Agent:** observability-reliability  
+**Deliverables:**
+- Zero-dependency Prometheus metrics registry (`CounterVec`, `GaugeVec`, `HistogramVec`, `/metrics` exposition) in `internal/observability/metrics.go` distinguishing `2xx`, `409`, `429`, and `5xx` by `arch` and normalized route
+- Structured JSON `slog` logger, correlation ID HTTP middleware, and NATS header propagation (`InjectNATSCorrelationID`, `ExtractNATSCorrelationID`) in `internal/observability/`
+- Instrumentation wired into `cmd/api-baseline`, `cmd/api-optimized`, and `cmd/worker`
+- Prometheus alert rules (`deploy/prometheus/alerts.yml`), Grafana dashboard provisioning (`deploy/grafana/provisioning/dashboards/apexstock.json`), metric catalog (`docs/observability/metric-catalog.md`), and incident response runbook (`docs/runbooks/incident-response.md`)
+
+**Verification:**
+```bash
+go build ./...                  # PASS
+go vet ./...                    # PASS
+go test -count=1 -race ./...    # PASS
+```
+
+**Acceptance:**
+- ✅ Order trace via `X-Correlation-ID` across HTTP and NATS
+- ✅ Business rejections (`409`/`429`) separated from `5xx` system failures
+- ✅ Latency histograms with `arch` and normalized `route` labels
+- ✅ Non-resetting `apexstock_oversell_total` invariant counter
+- ✅ Grafana dashboard & Prometheus alert rules provisioned
+
+**Commit SHA:** `627f740`
