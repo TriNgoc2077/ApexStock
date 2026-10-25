@@ -34,6 +34,16 @@ func (rw *responseWriter) Write(b []byte) (int, error) {
 // HTTPMiddleware instruments requests with correlation ID, Prometheus metrics, and structured JSON logs.
 func HTTPMiddleware(arch string, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Set CORS response headers
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Idempotency-Key, X-User-ID, X-Correlation-ID, Authorization")
+
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+
 		start := time.Now()
 
 		correlationID := r.Header.Get("X-Correlation-ID")
@@ -71,8 +81,14 @@ func HTTPMiddleware(arch string, next http.Handler) http.Handler {
 
 func normalizeRoute(path string) string {
 	switch {
+	case strings.HasPrefix(path, "/api/v1/flash-sale/items/"):
+		return "/api/v1/flash-sale/items/:id"
+	case strings.HasPrefix(path, "/api/v1/flash-sale/events"):
+		return "/api/v1/flash-sale/events"
 	case strings.HasPrefix(path, "/api/v1/flash-sale/orders"):
 		return "/api/v1/flash-sale/orders"
+	case strings.HasPrefix(path, "/api/v1/orders/"):
+		return "/api/v1/orders/:id"
 	case strings.HasPrefix(path, "/api/v1/payments/simulate"):
 		return "/api/v1/payments/simulate"
 	case strings.HasPrefix(path, "/api/v1/payments/sepay/initiate"):

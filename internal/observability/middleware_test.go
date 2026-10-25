@@ -92,3 +92,42 @@ func TestCorrelationID_PropagationAcrossNATS(t *testing.T) {
 		t.Fatalf("expected context ID 'trace-nats-999', got %q", CorrelationIDFromContext(newCtx))
 	}
 }
+
+func TestHTTPMiddleware_CORSPreflightAndRouteNormalization(t *testing.T) {
+	DefaultRegistry = NewRegistry()
+
+	dummyHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+	mw := HTTPMiddleware("baseline", dummyHandler)
+
+	// Test CORS OPTIONS preflight
+	reqOptions := httptest.NewRequest(http.MethodOptions, "/api/v1/flash-sale/orders", nil)
+	wOptions := httptest.NewRecorder()
+	mw.ServeHTTP(wOptions, reqOptions)
+
+	if wOptions.Code != http.StatusNoContent {
+		t.Fatalf("expected 204 No Content for OPTIONS, got %d", wOptions.Code)
+	}
+	if wOptions.Header().Get("Access-Control-Allow-Origin") != "*" {
+		t.Errorf("expected Access-Control-Allow-Origin = '*', got %q", wOptions.Header().Get("Access-Control-Allow-Origin"))
+	}
+	if !strings.Contains(wOptions.Header().Get("Access-Control-Allow-Methods"), "OPTIONS") {
+		t.Errorf("expected Access-Control-Allow-Methods to include OPTIONS, got %q", wOptions.Header().Get("Access-Control-Allow-Methods"))
+	}
+
+	// Test Route Normalization for items/<id>
+	if route := normalizeRoute("/api/v1/flash-sale/items/123"); route != "/api/v1/flash-sale/items/:id" {
+		t.Errorf("expected normalized route /api/v1/flash-sale/items/:id, got %q", route)
+	}
+
+	// Test Route Normalization for orders/<id>
+	if route := normalizeRoute("/api/v1/orders/456"); route != "/api/v1/orders/:id" {
+		t.Errorf("expected normalized route /api/v1/orders/:id, got %q", route)
+	}
+
+	// Test Route Normalization for events
+	if route := normalizeRoute("/api/v1/flash-sale/events"); route != "/api/v1/flash-sale/events" {
+		t.Errorf("expected normalized route /api/v1/flash-sale/events, got %q", route)
+	}
+}

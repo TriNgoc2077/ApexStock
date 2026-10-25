@@ -63,3 +63,23 @@ func TestCatalogHandler_GetOrderDetail_NotFound(t *testing.T) {
 		t.Fatalf("expected 404 Not Found, got %d", w.Code)
 	}
 }
+
+func TestCatalogHandler_InvalidUUID_Returns400(t *testing.T) {
+	handler := NewCatalogHandler(nil, nil)
+
+	// Invalid item UUID
+	reqItem := httptest.NewRequest(http.MethodGet, "/api/v1/flash-sale/items/invalid-uuid", nil)
+	wItem := httptest.NewRecorder()
+	handler.GetItemDetail(wItem, reqItem)
+	if wItem.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 Bad Request for invalid item UUID, got %d", wItem.Code)
+	}
+
+	// Invalid order UUID
+	reqOrder := httptest.NewRequest(http.MethodGet, "/api/v1/orders/not-a-valid-uuid", nil)
+	wOrder := httptest.NewRecorder()
+	handler.GetOrderDetail(wOrder, reqOrder)
+	if wOrder.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 Bad Request for invalid order UUID, got %d", wOrder.Code)
+	}
+}

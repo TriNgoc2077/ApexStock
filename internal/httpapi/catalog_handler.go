@@ -69,7 +69,7 @@ func (h *CatalogHandler) ListActiveEvents(w http.ResponseWriter, r *http.Request
 	rows, err := h.db.QueryContext(ctx, `
 		SELECT e.id, e.name, e.start_time, e.end_time, e.status,
 		       i.id, i.product_id, p.name, COALESCE(p.description, ''), COALESCE(p.image_url, ''),
-		       p.original_price, i.sale_price, i.initial_quantity, i.sold_quantity, i.max_per_user
+		       p.original_price, i.sale_price, i.total_quantity, i.sold_quantity, i.max_per_user
 		FROM flash_sale_events e
 		LEFT JOIN flash_sale_items i ON i.event_id = e.id
 		LEFT JOIN products p ON p.id = i.product_id
@@ -161,13 +161,17 @@ func (h *CatalogHandler) GetItemDetail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	itemID := pathParts[len(pathParts)-1]
+	if !validUUID(itemID) {
+		writeError(w, correlationID, domain.ValidationError("id", "ID sản phẩm không hợp lệ: phải là UUID hợp lệ"))
+		return
+	}
 
 	var item FlashSaleItemDTO
 	var soldQty int32
 
 	err := h.db.QueryRowContext(ctx, `
 		SELECT i.id, i.event_id, i.product_id, p.name, COALESCE(p.description, ''), COALESCE(p.image_url, ''),
-		       p.original_price, i.sale_price, i.initial_quantity, i.sold_quantity, i.max_per_user
+		       p.original_price, i.sale_price, i.total_quantity, i.sold_quantity, i.max_per_user
 		FROM flash_sale_items i
 		JOIN products p ON p.id = i.product_id
 		WHERE i.id = $1`, itemID).Scan(
@@ -207,6 +211,10 @@ func (h *CatalogHandler) GetOrderDetail(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	orderID := pathParts[len(pathParts)-1]
+	if !validUUID(orderID) {
+		writeError(w, correlationID, domain.ValidationError("id", "ID đơn hàng không hợp lệ: phải là UUID hợp lệ"))
+		return
+	}
 
 	var dto OrderDetailDTO
 	err := h.db.QueryRowContext(ctx, `
