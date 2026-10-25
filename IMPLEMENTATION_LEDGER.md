@@ -8,12 +8,12 @@
 ## 1. Trạng thái thực thi hiện tại (Current Execution State)
 
 - **Overall Status:** `IN_PROGRESS`
-- **Current Stage:** `Stage 9`
+- **Current Stage:** `Stage 10`
 - **Execution Mode:** `SEQUENTIAL` — một orchestrator duy nhất, chạy Stage 1 → Stage 13, mỗi lần một subagent
 - **Current Phase:** `IMPLEMENT` (`READY` | `IMPLEMENT` | `CHECKPOINT_COMMITTED` | `REVIEW_ROUND_1` | `REVIEW_ROUND_2` | `VERIFY` | `COMMITTED`)
 - **Base Commit SHA:** `91ce71c` (stage-0)
-- **Last Completed Stage:** `Stage 8`
-- **Last Completed Commit SHA:** `85d25ad`
+- **Last Completed Stage:** `Stage 9`
+- **Last Completed Commit SHA:** `909eaca`
 
 ---
 
@@ -52,8 +52,8 @@
 | **6** | SePay adapter thật cho UI | Stage 5 | `payment-integrations` | `backend-core` | `code-reviewer` | `COMPLETED` | 0 | `f2a25ba` |
 | **7** | Observability, metrics, logs & reliability baseline | Stage 3, 4, 5 | `observability-reliability` | `backend-core`, `infra-devops` | `code-reviewer` | `COMPLETED` | 0 | `627f740` |
 | **8** | Frontend product flow & design system | Stage 5 | `frontend-ui` | - | `code-reviewer` | `COMPLETED` | 1 | `85d25ad` |
-| **9** | War Room dashboard & chaos controller | Stage 7, 8 | `frontend-ui` | `backend-core`, `infra-devops` | `code-reviewer` | `IN_PROGRESS` | 0 | - |
-| **10** | QA test pyramid, concurrency & invariant verifier | Stage 3–9 | `qa-loadtest` | `backend-core` | `code-reviewer` | `PENDING` | 0 | - |
+| **9** | War Room dashboard & chaos controller | Stage 7, 8 | `frontend-ui` | `backend-core`, `infra-devops` | `code-reviewer` | `COMPLETED` | 1 | `909eaca` |
+| **10** | QA test pyramid, concurrency & invariant verifier | Stage 3–9 | `qa-loadtest` | `backend-core` | `code-reviewer` | `IN_PROGRESS` | 0 | - |
 | **11** | k6 benchmark & fair comparison | Stage 7, 10 | `qa-loadtest` | `infra-devops` | `code-reviewer` | `PENDING` | 0 | - |
 | **12** | Chaos, resilience, soak & system testing | Stage 7, 9, 10, 11 | `qa-loadtest` | `observability-reliability`, `infra-devops` | `code-reviewer` | `PENDING` | 0 | - |
 | **13** | Demo hardening, evidence pack & context handoff | Stage 11, 12 | `qa-loadtest` | `infra-devops`, `observability-reliability` | `code-reviewer` | `PENDING` | 0 | - |
@@ -309,3 +309,32 @@ cd web && npm run build         # PASS
 - ✅ Next.js App Router `[id]` segments and polling per D0.14
 
 **Commit SHA:** `85d25ad`
+
+
+### Stage 9: War Room dashboard & chaos controller
+
+**Phase:** COMMITTED  
+**Primary Agent:** frontend-ui  
+**Deliverables:**
+- War Room Controller service (`internal/warroom/service.go`) polling `/healthz` and `/metrics` from Baseline (`:8081`) and Optimized (`:8082`), computing RPS and `p50`/`p95`/`p99` histogram quantiles, and automatically detecting container/instance down transitions and recovery duration
+- War Room HTTP/SSE handlers (`internal/warroom/handler.go`) and `cmd/warroom-controller/main.go` wiring `/api/v1/warroom/snapshot`, `/api/v1/warroom/stream`, and `/api/v1/warroom/run` (enforcing D0.11 sequential benchmark run state machine and D0.12 zero container-kill endpoints)
+- Operator CLI chaos scripts (`scripts/chaos/{kill,restore}-{optimized,baseline}-api.sh`)
+- Frontend `/war-room` dashboard (`web/src/app/war-room/page.tsx`, `TelemetryPanel.tsx`, `VerdictSummaryModal.tsx`, `ActivityLogPanel.tsx`) with live SSE stream, reconnect indicator, oversell invariant badge, and hypothesis disclaimer
+
+**Verification:**
+```bash
+go build ./...                  # PASS
+go vet ./...                    # PASS
+go test -count=1 -race ./...    # PASS
+bash -n scripts/chaos/*.sh      # PASS
+cd web && npm run lint          # PASS
+cd web && npm run build         # PASS
+```
+
+**Acceptance:**
+- ✅ Idle screen shows Unknown/Healthy accurately
+- ✅ Sequential start/stop state machine & labeled parallel visual demo mode (D0.11)
+- ✅ Zero container kill/pause endpoints exposed to browser (D0.12); operator uses CLI scripts and War Room detects outage/recovery via health polling
+- ✅ Live SSE stream with stale/reconnect marker
+
+**Commit SHA:** `909eaca`
