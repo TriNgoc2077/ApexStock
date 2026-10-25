@@ -8,12 +8,12 @@
 ## 1. Trạng thái thực thi hiện tại (Current Execution State)
 
 - **Overall Status:** `IN_PROGRESS`
-- **Current Stage:** `Stage 11`
+- **Current Stage:** `Stage 12`
 - **Execution Mode:** `SEQUENTIAL` — một orchestrator duy nhất, chạy Stage 1 → Stage 13, mỗi lần một subagent
 - **Current Phase:** `IMPLEMENT` (`READY` | `IMPLEMENT` | `CHECKPOINT_COMMITTED` | `REVIEW_ROUND_1` | `REVIEW_ROUND_2` | `VERIFY` | `COMMITTED`)
 - **Base Commit SHA:** `91ce71c` (stage-0)
-- **Last Completed Stage:** `Stage 10`
-- **Last Completed Commit SHA:** `c5f25b5`
+- **Last Completed Stage:** `Stage 11`
+- **Last Completed Commit SHA:** `8e9186f`
 
 ---
 
@@ -54,8 +54,8 @@
 | **8** | Frontend product flow & design system | Stage 5 | `frontend-ui` | - | `code-reviewer` | `COMPLETED` | 1 | `85d25ad` |
 | **9** | War Room dashboard & chaos controller | Stage 7, 8 | `frontend-ui` | `backend-core`, `infra-devops` | `code-reviewer` | `COMPLETED` | 1 | `909eaca` |
 | **10** | QA test pyramid, concurrency & invariant verifier | Stage 3–9 | `qa-loadtest` | `backend-core` | `code-reviewer` | `COMPLETED` | 0 | `c5f25b5` |
-| **11** | k6 benchmark & fair comparison | Stage 7, 10 | `qa-loadtest` | `infra-devops` | `code-reviewer` | `IN_PROGRESS` | 0 | - |
-| **12** | Chaos, resilience, soak & system testing | Stage 7, 9, 10, 11 | `qa-loadtest` | `observability-reliability`, `infra-devops` | `code-reviewer` | `PENDING` | 0 | - |
+| **11** | k6 benchmark & fair comparison | Stage 7, 10 | `qa-loadtest` | `infra-devops` | `code-reviewer` | `COMPLETED` | 0 | `8e9186f` |
+| **12** | Chaos, resilience, soak & system testing | Stage 7, 9, 10, 11 | `qa-loadtest` | `observability-reliability`, `infra-devops` | `code-reviewer` | `IN_PROGRESS` | 0 | - |
 | **13** | Demo hardening, evidence pack & context handoff | Stage 11, 12 | `qa-loadtest` | `infra-devops`, `observability-reliability` | `code-reviewer` | `PENDING` | 0 | - |
 
 ---
@@ -363,3 +363,29 @@ go test -count=1 -race ./...    # PASS
 - ✅ Zero data races under `go test -race ./...`
 
 **Commit SHA:** `c5f25b5`
+
+
+### Stage 11: k6 benchmark & fair comparison
+
+**Phase:** COMMITTED  
+**Primary Agent:** qa-loadtest  
+**Deliverables:**
+- Deterministic k6 User/Idempotency Generators & Response Classifier (`loadtests/lib/generators.js`, `loadtests/lib/assertions.js`) matching `docs/benchmark/benchmark-matrix.yaml` (`33333333-3333-3333-3333-000000000001..50000`) and separating `201` (`SUCCESS`), `409`/`429` (`BUSINESS_REJECTION`), and `5xx`/timeouts (`SYSTEM_FAILURE`)
+- 5 k6 Scenarios (`loadtests/scenarios/{smoke,flash-sale-shock,sustainable-throughput,payment-restock,soak}.js`)
+- Fair Sequential Benchmark Runner & Metadata Collector (`scripts/benchmark/run-benchmark.sh`) enforcing D0.9/D0.10/D0.11 sequential execution, environment metadata provenance (`metadata.json`), and post-run invariant verification
+- Empirical Report Template (`docs/benchmark/report-template.md`) and Measurement Provenance rules (`docs/benchmark/measurement-provenance.md`)
+
+**Verification:**
+```bash
+node --check loadtests/lib/*.js loadtests/scenarios/*.js  # PASS
+bash -n scripts/benchmark/run-benchmark.sh                # PASS
+go test -count=1 -race ./...                              # PASS
+```
+
+**Acceptance:**
+- ✅ Identical k6 script targets Baseline (`:8081`) and Optimized (`:8082`) with identical payload
+- ✅ Sequential execution with reset/seed/warm-up/cooldown per run (D0.11)
+- ✅ Post-run invariant verification gate
+- ✅ Hypothesis numbers explicitly separated from measured results (D0.10)
+
+**Commit SHA:** `8e9186f`
