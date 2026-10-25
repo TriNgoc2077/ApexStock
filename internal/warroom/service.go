@@ -60,12 +60,12 @@ type WarRoomService struct {
 	optimizedURL string
 	client       *http.Client
 
-	snapshot     WarRoomSnapshot
-	subscribers  map[chan WarRoomSnapshot]struct{}
-	subMu        sync.Mutex
+	snapshot    WarRoomSnapshot
+	subscribers map[chan WarRoomSnapshot]struct{}
+	subMu       sync.Mutex
 
-	baseState    instanceState
-	optState     instanceState
+	baseState instanceState
+	optState  instanceState
 }
 
 func NewWarRoomService(baselineURL, optimizedURL string) *WarRoomService {
