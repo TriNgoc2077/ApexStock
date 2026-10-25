@@ -206,4 +206,3 @@ func TestOrderContract_InProcessHandlerVerification(t *testing.T) {
 		t.Fatalf("expected 400, got %d", respQty2.StatusCode)
 	}
 }
-
