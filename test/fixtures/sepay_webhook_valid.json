@@ -1,0 +1,14 @@
+{
+  "id": 987654,
+  "gateway": "MBBank",
+  "transactionDate": "2026-10-25 10:15:30",
+  "accountNumber": "0123456789",
+  "code": null,
+  "content": "DH 11111111-1111-1111-1111-111111111111",
+  "transferType": "in",
+  "transferAmount": 100000,
+  "accumulated": 5000000,
+  "subAccount": null,
+  "referenceCode": "FT24298123456789",
+  "description": "Thanh toan don hang DH 11111111-1111-1111-1111-111111111111"
+}
