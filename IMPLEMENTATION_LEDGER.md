@@ -8,12 +8,12 @@
 ## 1. Trạng thái thực thi hiện tại (Current Execution State)
 
 - **Overall Status:** `IN_PROGRESS`
-- **Current Stage:** `Stage 10`
+- **Current Stage:** `Stage 11`
 - **Execution Mode:** `SEQUENTIAL` — một orchestrator duy nhất, chạy Stage 1 → Stage 13, mỗi lần một subagent
 - **Current Phase:** `IMPLEMENT` (`READY` | `IMPLEMENT` | `CHECKPOINT_COMMITTED` | `REVIEW_ROUND_1` | `REVIEW_ROUND_2` | `VERIFY` | `COMMITTED`)
 - **Base Commit SHA:** `91ce71c` (stage-0)
-- **Last Completed Stage:** `Stage 9`
-- **Last Completed Commit SHA:** `909eaca`
+- **Last Completed Stage:** `Stage 10`
+- **Last Completed Commit SHA:** `c5f25b5`
 
 ---
 
@@ -53,8 +53,8 @@
 | **7** | Observability, metrics, logs & reliability baseline | Stage 3, 4, 5 | `observability-reliability` | `backend-core`, `infra-devops` | `code-reviewer` | `COMPLETED` | 0 | `627f740` |
 | **8** | Frontend product flow & design system | Stage 5 | `frontend-ui` | - | `code-reviewer` | `COMPLETED` | 1 | `85d25ad` |
 | **9** | War Room dashboard & chaos controller | Stage 7, 8 | `frontend-ui` | `backend-core`, `infra-devops` | `code-reviewer` | `COMPLETED` | 1 | `909eaca` |
-| **10** | QA test pyramid, concurrency & invariant verifier | Stage 3–9 | `qa-loadtest` | `backend-core` | `code-reviewer` | `IN_PROGRESS` | 0 | - |
-| **11** | k6 benchmark & fair comparison | Stage 7, 10 | `qa-loadtest` | `infra-devops` | `code-reviewer` | `PENDING` | 0 | - |
+| **10** | QA test pyramid, concurrency & invariant verifier | Stage 3–9 | `qa-loadtest` | `backend-core` | `code-reviewer` | `COMPLETED` | 0 | `c5f25b5` |
+| **11** | k6 benchmark & fair comparison | Stage 7, 10 | `qa-loadtest` | `infra-devops` | `code-reviewer` | `IN_PROGRESS` | 0 | - |
 | **12** | Chaos, resilience, soak & system testing | Stage 7, 9, 10, 11 | `qa-loadtest` | `observability-reliability`, `infra-devops` | `code-reviewer` | `PENDING` | 0 | - |
 | **13** | Demo hardening, evidence pack & context handoff | Stage 11, 12 | `qa-loadtest` | `infra-devops`, `observability-reliability` | `code-reviewer` | `PENDING` | 0 | - |
 
@@ -338,3 +338,28 @@ cd web && npm run build         # PASS
 - ✅ Live SSE stream with stale/reconnect marker
 
 **Commit SHA:** `909eaca`
+
+
+### Stage 10: QA test pyramid, concurrency & invariant verifier
+
+**Phase:** COMMITTED  
+**Primary Agent:** qa-loadtest  
+**Deliverables:**
+- Cross-architecture Invariant Verifier (`test/system/invariant_verifier.go`, `test/system/invariant_verifier_test.go`) validating I1 (stock conservation equation `available + reserved + paid == total`, `available >= 0`), I2/I4 (order vs payment terminal state transitions), I3 (idempotency uniqueness), and I5 (`processed_events` deduplication)
+- Common API Contract Test Suite (`test/contract/order_contract_test.go`) verifying `201/400/404/409/503`, `ErrorEnvelope` schema, `X-Correlation-ID` propagation, and D0.4 single-unit enforcement across Baseline and Optimized
+- Security & Boundary Verification Suite (`test/contract/security_test.go`) testing 1MB request body limit, SQL injection payload rejection, and D0.12 zero chaos/container-kill HTTP endpoints
+
+**Verification:**
+```bash
+go build ./...                  # PASS
+go vet ./...                    # PASS
+go test -count=1 -race ./...    # PASS
+```
+
+**Acceptance:**
+- ✅ Invariants I1–I5 verified across both architectures
+- ✅ Contract parity between `:8081` (Baseline) and `:8082` (Optimized)
+- ✅ Security boundary and D0.12 verified
+- ✅ Zero data races under `go test -race ./...`
+
+**Commit SHA:** `c5f25b5`
