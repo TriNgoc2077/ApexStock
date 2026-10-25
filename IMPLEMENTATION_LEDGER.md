@@ -8,12 +8,12 @@
 ## 1. Trạng thái thực thi hiện tại (Current Execution State)
 
 - **Overall Status:** `IN_PROGRESS`
-- **Current Stage:** `Stage 4`
+- **Current Stage:** `Stage 5`
 - **Execution Mode:** `SEQUENTIAL` — một orchestrator duy nhất, chạy Stage 1 → Stage 13, mỗi lần một subagent
 - **Current Phase:** `IMPLEMENT` (`READY` | `IMPLEMENT` | `CHECKPOINT_COMMITTED` | `REVIEW_ROUND_1` | `REVIEW_ROUND_2` | `VERIFY` | `COMMITTED`)
 - **Base Commit SHA:** `91ce71c` (stage-0)
-- **Last Completed Stage:** `Stage 3`
-- **Last Completed Commit SHA:** `820b61c`
+- **Last Completed Stage:** `Stage 4`
+- **Last Completed Commit SHA:** `a914a16`
 
 ---
 
@@ -46,9 +46,9 @@
 | **0** | Contract, decision gate & skeleton docs | None | `stages-planner` / `backend-core` | `infra-devops` | `code-reviewer` | `COMPLETED` | 0 | `91ce71c` |
 | **1** | Host foundation, Docker Compose & health slice | Stage 0 | `infra-devops` | `backend-core`, `frontend-ui` | `code-reviewer` | `COMPLETED` | 0 | `8ce7d19` |
 | **2** | PostgreSQL migration, Redis keyspace & seed/reset | Stage 1 | `backend-core` | `infra-devops` | `code-reviewer` | `COMPLETED` | 1 | `bc2ba07` |
-| **3** | Baseline order vertical slice | Stage 2 | `backend-core` | - | `code-reviewer` | `COMPLETED` | 1 | `-` |
-| **4** | Optimized reservation, idempotency, NATS & worker | Stage 2, 3 | `backend-core` | `infra-devops` | `code-reviewer` | `PENDING` | 0 | - |
-| **5** | Payment simulator, confirm/fail/timeout/cancel & restock | Stage 3, 4 | `backend-core` | `payment-integrations` | `code-reviewer` | `PENDING` | 0 | - |
+| **3** | Baseline order vertical slice | Stage 2 | `backend-core` | - | `code-reviewer` | `COMPLETED` | 1 | `820b61c` |
+| **4** | Optimized reservation, idempotency, NATS & worker | Stage 2, 3 | `backend-core` | `infra-devops` | `code-reviewer` | `COMPLETED` | 0 | `a914a16` |
+| **5** | Payment simulator, confirm/fail/timeout/cancel & restock | Stage 3, 4 | `backend-core` | `payment-integrations` | `code-reviewer` | `IN_PROGRESS` | 0 | - |
 | **6** | SePay adapter thật cho UI | Stage 5 | `payment-integrations` | `backend-core` | `code-reviewer` | `PENDING` | 0 | - |
 | **7** | Observability, metrics, logs & reliability baseline | Stage 3, 4, 5 | `observability-reliability` | `backend-core`, `infra-devops` | `code-reviewer` | `PENDING` | 0 | - |
 | **8** | Frontend product flow & design system | Stage 5 | `frontend-ui` | - | `code-reviewer` | `PENDING` | 0 | - |
@@ -169,3 +169,31 @@ docker compose config -q            # PASS (agent verification)
 - ✅ Reset and reconciliation tooling
 
 **Commit SHA:** (pending)
+
+
+### Stage 4: Optimized reservation, idempotency, NATS & worker
+
+**Phase:** COMMITTED  
+**Primary Agent:** backend-core  
+**Deliverables:**
+- Cryptographically random RFC 4122 UUIDv4 generation in `internal/optimized/service.go`
+- `ErrRedisUnavailable` sentinel and HTTP 503 (`service_unavailable`) mapping in `internal/httpapi/optimized_handler.go`
+- Worker daemon wired with PostgreSQL pool, NATS JetStream consumer and signal handling in `cmd/worker/main.go`
+- Inventory reconciliation verifier (`ReconcileItem`, `ReconcileAll`) in `internal/optimized/reconcile.go`
+- Comprehensive unit, integration, and 100-goroutine concurrency tests for Redis Lua reserve/release/confirm, NATS worker persistence/dedup, and race detector verification
+
+**Verification:**
+```bash
+go build ./...                  # PASS
+go vet ./...                    # PASS
+go test -count=1 -race ./...    # PASS
+```
+
+**Acceptance:**
+- ✅ Concurrent reserve does not oversell (Invariant I1)
+- ✅ Same idempotency key performs single reservation (Invariant I3)
+- ✅ Durable JetStream publish and worker `processed_events` deduplication (Invariant I5)
+- ✅ Redis down fails fast with HTTP 503
+- ✅ Reconciliation verifier checks stock equation
+
+**Commit SHA:** `a914a16`
