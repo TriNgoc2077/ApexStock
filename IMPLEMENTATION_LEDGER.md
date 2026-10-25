@@ -8,12 +8,12 @@
 ## 1. Trạng thái thực thi hiện tại (Current Execution State)
 
 - **Overall Status:** `IN_PROGRESS`
-- **Current Stage:** `Stage 6`
+- **Current Stage:** `Stage 7`
 - **Execution Mode:** `SEQUENTIAL` — một orchestrator duy nhất, chạy Stage 1 → Stage 13, mỗi lần một subagent
 - **Current Phase:** `IMPLEMENT` (`READY` | `IMPLEMENT` | `CHECKPOINT_COMMITTED` | `REVIEW_ROUND_1` | `REVIEW_ROUND_2` | `VERIFY` | `COMMITTED`)
 - **Base Commit SHA:** `91ce71c` (stage-0)
-- **Last Completed Stage:** `Stage 5`
-- **Last Completed Commit SHA:** `a2b6053`
+- **Last Completed Stage:** `Stage 6`
+- **Last Completed Commit SHA:** `f2a25ba`
 
 ---
 
@@ -49,8 +49,8 @@
 | **3** | Baseline order vertical slice | Stage 2 | `backend-core` | - | `code-reviewer` | `COMPLETED` | 1 | `820b61c` |
 | **4** | Optimized reservation, idempotency, NATS & worker | Stage 2, 3 | `backend-core` | `infra-devops` | `code-reviewer` | `COMPLETED` | 0 | `a914a16` |
 | **5** | Payment simulator, confirm/fail/timeout/cancel & restock | Stage 3, 4 | `backend-core` | `payment-integrations` | `code-reviewer` | `COMPLETED` | 1 | `a2b6053` |
-| **6** | SePay adapter thật cho UI | Stage 5 | `payment-integrations` | `backend-core` | `code-reviewer` | `IN_PROGRESS` | 0 | - |
-| **7** | Observability, metrics, logs & reliability baseline | Stage 3, 4, 5 | `observability-reliability` | `backend-core`, `infra-devops` | `code-reviewer` | `PENDING` | 0 | - |
+| **6** | SePay adapter thật cho UI | Stage 5 | `payment-integrations` | `backend-core` | `code-reviewer` | `COMPLETED` | 0 | `f2a25ba` |
+| **7** | Observability, metrics, logs & reliability baseline | Stage 3, 4, 5 | `observability-reliability` | `backend-core`, `infra-devops` | `code-reviewer` | `IN_PROGRESS` | 0 | - |
 | **8** | Frontend product flow & design system | Stage 5 | `frontend-ui` | - | `code-reviewer` | `PENDING` | 0 | - |
 | **9** | War Room dashboard & chaos controller | Stage 7, 8 | `frontend-ui` | `backend-core`, `infra-devops` | `code-reviewer` | `PENDING` | 0 | - |
 | **10** | QA test pyramid, concurrency & invariant verifier | Stage 3–9 | `qa-loadtest` | `backend-core` | `code-reviewer` | `PENDING` | 0 | - |
@@ -227,3 +227,30 @@ bash scripts/reconcile.sql.sh   # PASS
 - ✅ Post-run reconciliation passes
 
 **Commit SHA:** `a2b6053`
+
+
+### Stage 6: SePay adapter thật cho UI
+
+**Phase:** COMMITTED  
+**Primary Agent:** payment-integrations  
+**Deliverables:**
+- Provider-isolated SePay adapter (`internal/payments/sepay/adapter.go`) with environment-variable configuration, QR code URL generation, and timing-safe `Apikey`/`Bearer`/`X-Sepay-Signature` verification
+- SePay webhook and initiate HTTP handlers (`internal/httpapi/sepay_webhook_handler.go`) mounted at `POST /api/v1/payments/sepay/initiate` and `POST /api/v1/webhooks/sepay` on both Baseline and Optimized APIs
+- Webhook audit logging (`webhook_logs`) and D0.7 late-payment refund policy integration
+- Webhook test fixtures (`test/fixtures/sepay_webhook_*.json`) and local demo runbook (`docs/runbooks/sepay-local-demo.md`)
+
+**Verification:**
+```bash
+go build ./...                  # PASS
+go vet ./...                    # PASS
+go test -count=1 -race ./...    # PASS
+```
+
+**Acceptance:**
+- ✅ Zero hardcoded credentials in Git (D0.6)
+- ✅ Valid fixture updates order/payment exactly once
+- ✅ Invalid signature rejected with 401 without mutating stock
+- ✅ Duplicate webhook is idempotent
+- ✅ Late payment after expiry follows D0.7 refund policy
+
+**Commit SHA:** `f2a25ba`
