@@ -75,6 +75,8 @@ func writeOptimizedError(w http.ResponseWriter, correlationID string, err error)
 		d = domain.ConflictError("max_per_user_reached", "Bạn đã đạt giới hạn mua cho sản phẩm này", nil)
 	case errors.Is(err, optimized.ErrIdempotencyConflict):
 		d = domain.ConflictError("idempotency_conflict", "Idempotency key đã được dùng với payload khác", nil)
+	case errors.Is(err, optimized.ErrRedisUnavailable):
+		d = domain.ServiceUnavailableError()
 	default:
 		d = domain.ServiceUnavailableError()
 	}

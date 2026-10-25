@@ -22,6 +22,7 @@ var (
 	ErrOutOfStock          = errors.New("out of stock")
 	ErrMaxPerUser          = errors.New("max per user")
 	ErrIdempotencyConflict = errors.New("idempotency conflict")
+	ErrRedisUnavailable    = errors.New("redis unavailable")
 )
 
 const reserveLua = `-- atomic reserve; see internal/persistence/redis/lua/reserve_order.lua
@@ -74,7 +75,7 @@ func (s *Service) Create(ctx context.Context, req domain.CreateOrderRequest) (do
 	created := now
 	vals, err := s.rdb.Eval(ctx, reserveLua, []string{rediskeys.StockKey(req.FlashSaleItemID), rediskeys.ReservedKey(req.FlashSaleItemID), rediskeys.UserKey(req.FlashSaleItemID, req.UserID), rediskeys.IdempotencyUserKey(req.FlashSaleItemID, req.UserID, req.IdempotencyKey), rediskeys.ReservationKey(req.FlashSaleItemID, reservationID)}, req.Quantity, it.Max, reservationID, orderID, req.FlashSaleItemID, req.UserID, expires.Unix(), fingerprint, strconv.FormatInt(total, 10), created.Format(time.RFC3339Nano)).Result()
 	if err != nil {
-		return domain.OrderResponse{}, err
+		return domain.OrderResponse{}, fmt.Errorf("%w: %v", ErrRedisUnavailable, err)
 	}
 	a, ok := vals.([]interface{})
 	if !ok || len(a) < 2 {
@@ -98,7 +99,7 @@ func (s *Service) Create(ctx context.Context, req domain.CreateOrderRequest) (do
 		event := messaging.OrderReserved{EventID: response.OrderID, OrderID: response.OrderID, ReservationID: response.ReservationID, UserID: response.UserID, ItemID: response.FlashSaleItemID, ProductID: it.ProductID, Quantity: response.Quantity, TotalAmount: response.TotalAmount, ExpiresAt: response.ExpiresAt, CreatedAt: response.CreatedAt, IdempotencyKey: req.IdempotencyKey}
 		if err = s.nats.Publish(ctx, event); err != nil {
 			_, _ = s.rdb.Eval(ctx, releaseLua, []string{rediskeys.StockKey(req.FlashSaleItemID), rediskeys.ReservedKey(req.FlashSaleItemID), rediskeys.UserKey(req.FlashSaleItemID, req.UserID), rediskeys.ReservationKey(req.FlashSaleItemID, response.ReservationID)}, response.ReservationID).Result()
-			return domain.OrderResponse{}, err
+			return domain.OrderResponse{}, fmt.Errorf("publish failed: %w", err)
 		}
 	}
 	return response, nil
