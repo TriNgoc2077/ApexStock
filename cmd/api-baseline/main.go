@@ -12,6 +12,7 @@ import (
 	"apexstock/internal/config"
 	"apexstock/internal/domain"
 	"apexstock/internal/httpapi"
+	"apexstock/internal/payments"
 
 	_ "github.com/lib/pq"
 )
@@ -37,6 +38,11 @@ func main() {
 	mux.Handle("POST /api/v1/flash-sale/orders", httpapi.BaselineOrderHandler(func(ctx context.Context, req domain.CreateOrderRequest) (domain.OrderResponse, error) {
 		return service.Create(ctx, req)
 	}))
+
+	// Payment simulation endpoint
+	paymentSvc := payments.NewBaselineService(db)
+	paymentSim := payments.NewSimulator(paymentSvc, payments.DefaultSimulatorConfig())
+	mux.Handle("POST /api/v1/payments/simulate", httpapi.SimulatePaymentHandler(paymentSim))
 
 	addr := fmt.Sprintf(":%d", cfg.BaselinePort)
 	log.Printf("[api-baseline] Starting on %s", addr)
