@@ -1,0 +1,104 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "collapsed": false,
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
+      "id": 1,
+      "title": "Invariant Status: Oversell Total",
+      "type": "stat",
+      "datasource": "Prometheus",
+      "targets": [
+        { "expr": "sum(oversell_total) or vector(0)", "refId": "A" }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 1 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
+      "id": 2,
+      "title": "Throughput (RPS): Baseline vs Optimized",
+      "type": "stat",
+      "datasource": "Prometheus",
+      "targets": [
+        { "expr": "sum(rate(http_requests_total[30s])) by (arch)", "legendFormat": "{{arch}}", "refId": "A" }
+      ]
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
+      "id": 3,
+      "title": "Optimized p99 Latency",
+      "type": "stat",
+      "datasource": "Prometheus",
+      "targets": [
+        { "expr": "histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket{arch=\"optimized\"}[1m])) by (le)) * 1000", "refId": "A" }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "ms" }
+      }
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
+      "id": 4,
+      "title": "NATS Queue Lag",
+      "type": "stat",
+      "datasource": "Prometheus",
+      "targets": [
+        { "expr": "sum(nats_queue_lag) or vector(0)", "refId": "A" }
+      ]
+    },
+    {
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+      "id": 5,
+      "title": "HTTP Traffic Breakdown (2xx / 409 Conflict / 429 Rate Limit / 5xx Error)",
+      "type": "timeseries",
+      "datasource": "Prometheus",
+      "targets": [
+        { "expr": "sum(rate(http_requests_total{status=~\"2..\"}[30s])) by (arch)", "legendFormat": "{{arch}} 2xx Success", "refId": "A" },
+        { "expr": "sum(rate(http_requests_total{status=\"409\"}[30s])) by (arch)", "legendFormat": "{{arch}} 409 Out of Stock", "refId": "B" },
+        { "expr": "sum(rate(http_requests_total{status=\"429\"}[30s])) by (arch)", "legendFormat": "{{arch}} 429 Rate Limited", "refId": "C" },
+        { "expr": "sum(rate(http_requests_total{status=~\"5..\"}[30s])) by (arch)", "legendFormat": "{{arch}} 5xx Server Error", "refId": "D" }
+      ]
+    },
+    {
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+      "id": 6,
+      "title": "Latency Percentiles (p50 / p95 / p99)",
+      "type": "timeseries",
+      "datasource": "Prometheus",
+      "targets": [
+        { "expr": "histogram_quantile(0.50, sum(rate(http_request_duration_seconds_bucket[1m])) by (le, arch)) * 1000", "legendFormat": "{{arch}} p50", "refId": "A" },
+        { "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[1m])) by (le, arch)) * 1000", "legendFormat": "{{arch}} p95", "refId": "B" },
+        { "expr": "histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket[1m])) by (le, arch)) * 1000", "legendFormat": "{{arch}} p99", "refId": "C" }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "ms" }
+      }
+    }
+  ],
+  "schemaVersion": 38,
+  "style": "dark",
+  "tags": ["apexstock", "flash-sale", "benchmark"],
+  "time": { "from": "now-15m", "to": "now" },
+  "title": "ApexStock System Health & Benchmark War Room",
+  "uid": "apexstock-war-room"
+}

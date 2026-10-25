@@ -1,166 +1,80 @@
-# ApexStock
+# ⚡ ApexStock — High-Concurrency Flash Sale Benchmark Platform
 
-Flash sale high-concurrency comparison: **Baseline** (Go → PostgreSQL `SELECT ... FOR UPDATE`) vs **Optimized** (Nginx → Go → Redis/Lua → NATS JetStream → Worker → PostgreSQL).
-
-**Host:** Laptop i5-10500H 6C/12T, 16GB RAM, Docker Compose.
-
----
-
-## Quick Start
-
-```bash
-# Build Go binaries
-make build
-
-# Run tests
-make test
-
-# Start dev environment
-docker compose -f deploy/compose/docker-compose.yaml --profile dev up -d
-
-# Check health
-curl http://localhost:8081/healthz  # Baseline API
-curl http://localhost:8082/healthz  # Optimized API (via Nginx)
-```
+> **Báo Cáo Thực Tập Tốt Nghiệp**  
+> So sánh thực nghiệm hiệu năng giữa Kiến Trúc Truyền Thống (**Baseline**: PostgreSQL Row Locking) và Kiến Trúc Tối Ưu (**Optimized**: Redis Lua Atomic Reservation + NATS JetStream Durable Queue) dưới tải cao và kịch bản Chaos Engineering.
 
 ---
 
-## Profiles
+## 🚀 Quick Start (Khởi Động Nhanh Trong 1 Phút)
 
-- **dev**: Minimal services for development
-- **demo**: Full UI + War Room + both architectures
-- **benchmark**: Locked resources, sequential testing
-- **observability**: Prometheus + Grafana
-
+### 1. Khởi động toàn bộ hệ thống
 ```bash
-# Start demo profile
+# Khởi động cơ sở hạ tầng, 2 phiên bản API, Worker, War Room và Web UI
 docker compose -f deploy/compose/docker-compose.yaml --profile demo up -d
-
-# Access UI
-open http://localhost:3000       # Next.js frontend
-open http://localhost:3001       # Grafana (admin/admin)
-open http://localhost:9090       # Prometheus
 ```
 
----
-
-## Architecture
-
-**Baseline (:8081)**
-- Direct PostgreSQL with `SELECT ... FOR UPDATE`
-
-**Optimized (:8082)**
-- Nginx load balancer (2 replicas)
-- Redis inventory cache (`noeviction` policy, D0.13)
-- NATS JetStream (persistent)
-- Async worker for payment confirmation
-
-**Databases** (D0.15)
-- `apexstock_baseline` — Baseline data
-- `apexstock_optimized` — Optimized data
-- Same migration + seed IDs, isolated data
-
----
-
-## API Contract (D0.2)
-
-```
-POST /api/v1/flash-sale/orders
-Content-Type: application/json
-
-{
-  "flash_sale_id": "uuid",
-  "item_id": "uuid",
-  "user_id": "uuid",
-  "quantity": 1,
-  "idempotency_key": "client-generated-uuid"
-}
-
-→ 201 Created (success)
-→ 409 Conflict (stock exhausted, idempotency conflict)
-→ 422 Unprocessable Entity (validation error)
-```
-
----
-
-## Project Structure
-
-```
-.
-├── cmd/
-│   ├── api-baseline/       # Baseline API (:8081)
-│   ├── api-optimized/      # Optimized API (:8082)
-│   ├── worker/             # NATS consumer + payment confirm
-│   └── warroom-controller/ # War Room WebSocket + chaos control
-├── internal/
-│   ├── config/             # Environment config
-│   └── httpapi/            # Health endpoints
-├── web/                    # Next.js frontend
-├── deploy/
-│   ├── compose/            # Docker Compose
-│   ├── docker/             # Dockerfiles
-│   ├── nginx/              # Nginx config
-│   ├── prometheus/         # Prometheus config
-│   └── grafana/            # Grafana provisioning
-├── docs/
-│   ├── decisions/          # D0.1–D0.15 locked decisions
-│   ├── contracts/          # API contracts
-│   ├── benchmark/          # Resource matrix & scenarios
-│   └── domain/             # Inventory state model
-├── scripts/                # Seed, reset, benchmark scripts
-└── loadtests/              # k6 scenarios
-```
-
----
-
-## Decisions Gate D0
-
-All 15 decisions locked — see `docs/decisions/D0-decisions-summary.md`:
-- **D0.2**: Common endpoint, separate ports (`:8081`, `:8082`)
-- **D0.4**: Single-item orders only
-- **D0.13**: Redis `noeviction` policy
-- **D0.15**: Two databases in one PostgreSQL container
-
----
-
-## Development
-
+### 2. Khởi tạo dữ liệu mẫu (Seed & Warm-up)
 ```bash
-# Format & vet
-gofmt -l . && go vet ./...
-
-# Test with race detector
-go test -race ./...
-
-# Build Docker images
-docker compose -f deploy/compose/docker-compose.yaml build
-
-# Run migrations & seed data
-make db-migrate
-make db-seed
-
-# Warm up Redis cache
-make db-warmup
-
-# Reset all data
-make db-reset
-
-# View logs
-docker compose -f deploy/compose/docker-compose.yaml logs -f api-baseline
+./scripts/reset-data.sh && ./scripts/seed-data.sh && ./scripts/warmup-redis.sh
 ```
 
-**Note:** Database scripts require PostgreSQL container running. Use `POSTGRES_HOST=localhost POSTGRES_PORT=5432` to run from host when port is exposed, or run inside Compose network.
+### 3. Kiểm tra tự động toàn hệ thống (Rehearsal)
+```bash
+./scripts/demo/rehearsal.sh
+```
 
 ---
 
-## Stage 2 Status
+## 🌐 Các Cổng Truy Cập Dịch Vụ
 
-✅ PostgreSQL schema migrations (shared across 2 DBs per D0.15)  
-✅ Redis Lua scripts (reserve/release/confirm/rate-limit)  
-✅ Deterministic seed data (50K users, flash-sale events, 10K stock)  
-✅ Reset/warmup/reconciliation scripts  
-✅ Idempotency keys and inventory state model (I1–I5)
+| Dịch Vụ | URL | Mục Đích |
+| :--- | :--- | :--- |
+| **Web UI (Next.js)** | `http://localhost:3000` | Giao diện mua hàng Flash Sale, quét mã VietQR |
+| **War Room Dashboard** | `http://localhost:3000/war-room` | Trung tâm điều khiển so sánh RPS, Latency, Invariant real-time |
+| **War Room Controller** | `http://localhost:9000` | API & SSE Stream tổng hợp metrics |
+| **Optimized API (NGINX)** | `http://localhost:8082` | Cổng phân tán tải (Redis Lua + NATS) |
+| **Baseline API** | `http://localhost:8081` | Cổng truyền thống (PostgreSQL Row Lock) |
+| **Prometheus** | `http://localhost:9090` | Thu thập metrics và cảnh báo vi phạm |
+| **Grafana** | `http://localhost:3001` | Dashboard trực quan hóa hiệu năng |
 
 ---
 
-**Next Stage:** Stage 3 — Baseline API implementation
+## 🛡️ Chứng Nhận Invariant & Không Bị Oversell
+
+Hệ thống cam kết 5 Invariant bất biến toán học:
+- **I1:** `Kho khả dụng + Đơn đang giữ + Đơn đã thanh toán == Tổng số lượng ban đầu` (Tuyệt đối không oversell).
+- **I2:** Mọi yêu cầu giữ hàng đều kết thúc ở trạng thái `confirmed` hoặc `released`.
+- **I3:** Mỗi `idempotency_key` tạo ra tối đa đúng một đơn hàng.
+- **I4:** Trạng thái đơn hàng và thanh toán tuân thủ nghiêm ngặt State Machine.
+- **I5:** Worker xử lý mỗi sự kiện JetStream tối đa một lần (`processed_events`).
+
+Kiểm tra Invariant bất kỳ lúc nào bằng lệnh:
+```bash
+./scripts/reconcile.sql.sh
+```
+
+---
+
+## 📊 Kịch Bản Chạy Benchmark (k6)
+
+Chạy benchmark so sánh tuần tự công bằng (Tuân thủ Decision Gate D0.11):
+```bash
+# Đo đột biến tranh chấp kho (Flash-sale Shock Contention)
+./scripts/benchmark/run-benchmark.sh flash-sale-shock 3
+
+# Đo thông lượng tối đa bền vững (Plateau Stepped RPS)
+./scripts/benchmark/run-benchmark.sh sustainable-throughput 3
+```
+
+---
+
+## 💥 Thao Tác Kịch Bản Chaos (Dành Cho Operator)
+
+Tuân thủ Decision Gate D0.12 (không có nút bấm nguy hiểm trên Web):
+```bash
+# Mô phỏng sập 1 instance API Optimized
+./scripts/chaos/kill-optimized-api.sh
+
+# Phục hồi instance và quan sát thời gian tự phục hồi trên War Room
+./scripts/chaos/restore-optimized-api.sh
+```

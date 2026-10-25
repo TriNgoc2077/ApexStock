@@ -12,6 +12,9 @@ import (
 	"apexstock/internal/config"
 	"apexstock/internal/domain"
 	"apexstock/internal/httpapi"
+	"apexstock/internal/observability"
+	"apexstock/internal/payments"
+	"apexstock/internal/payments/sepay"
 
 	_ "github.com/lib/pq"
 )
@@ -38,9 +41,35 @@ func main() {
 		return service.Create(ctx, req)
 	}))
 
+	// Catalog & Order read endpoints
+	catalogHandler := httpapi.NewCatalogHandler(db, nil)
+	mux.HandleFunc("GET /api/v1/flash-sale/events", catalogHandler.ListActiveEvents)
+	mux.HandleFunc("GET /api/v1/flash-sale/items/", catalogHandler.GetItemDetail)
+	mux.HandleFunc("GET /api/v1/orders/", catalogHandler.GetOrderDetail)
+
+	// Payment simulation endpoint
+	paymentSvc := payments.NewBaselineService(db)
+	paymentSim := payments.NewSimulator(paymentSvc, payments.DefaultSimulatorConfig())
+	mux.Handle("POST /api/v1/payments/simulate", httpapi.SimulatePaymentHandler(paymentSim))
+
+	// Mount SePay adapter and endpoints
+	sepayCfg := sepay.LoadConfigFromEnv()
+	sepayAdapter := sepay.NewAdapter(sepayCfg)
+	sepayHandler := httpapi.NewSepayWebhookHandler(sepayAdapter, paymentSvc, db)
+
+	mux.HandleFunc("POST /api/v1/payments/sepay/initiate", sepayHandler.HandleInitiate)
+	mux.HandleFunc("POST /api/v1/webhooks/sepay", sepayHandler.HandleWebhook)
+
+	// Observability: initialize structured JSON logger and metrics endpoint
+	observability.InitLogger(cfg.Environment)
+	mux.HandleFunc("/metrics", observability.MetricsHandler())
+
+	// Wrap entire mux with Observability HTTPMiddleware
+	handler := observability.HTTPMiddleware("baseline", mux)
+
 	addr := fmt.Sprintf(":%d", cfg.BaselinePort)
 	log.Printf("[api-baseline] Starting on %s", addr)
-	if err := http.ListenAndServe(addr, mux); err != nil {
+	if err := http.ListenAndServe(addr, handler); err != nil {
 		log.Fatalf("[api-baseline] Server failed: %v", err)
 		os.Exit(1)
 	}

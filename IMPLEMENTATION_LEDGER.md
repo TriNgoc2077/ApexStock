@@ -7,13 +7,13 @@
 
 ## 1. Trạng thái thực thi hiện tại (Current Execution State)
 
-- **Overall Status:** `IN_PROGRESS`
-- **Current Stage:** `Stage 4`
+- **Overall Status:** `COMPLETED`
+- **Current Stage:** `Stage 13 (All Stages Complete)`
 - **Execution Mode:** `SEQUENTIAL` — một orchestrator duy nhất, chạy Stage 1 → Stage 13, mỗi lần một subagent
-- **Current Phase:** `IMPLEMENT` (`READY` | `IMPLEMENT` | `CHECKPOINT_COMMITTED` | `REVIEW_ROUND_1` | `REVIEW_ROUND_2` | `VERIFY` | `COMMITTED`)
+- **Current Phase:** `COMMITTED` (`READY` | `IMPLEMENT` | `CHECKPOINT_COMMITTED` | `REVIEW_ROUND_1` | `REVIEW_ROUND_2` | `VERIFY` | `COMMITTED`)
 - **Base Commit SHA:** `91ce71c` (stage-0)
-- **Last Completed Stage:** `Stage 3`
-- **Last Completed Commit SHA:** `820b61c`
+- **Last Completed Stage:** `Stage 13`
+- **Last Completed Commit SHA:** `56e8ff7`
 
 ---
 
@@ -46,17 +46,17 @@
 | **0** | Contract, decision gate & skeleton docs | None | `stages-planner` / `backend-core` | `infra-devops` | `code-reviewer` | `COMPLETED` | 0 | `91ce71c` |
 | **1** | Host foundation, Docker Compose & health slice | Stage 0 | `infra-devops` | `backend-core`, `frontend-ui` | `code-reviewer` | `COMPLETED` | 0 | `8ce7d19` |
 | **2** | PostgreSQL migration, Redis keyspace & seed/reset | Stage 1 | `backend-core` | `infra-devops` | `code-reviewer` | `COMPLETED` | 1 | `bc2ba07` |
-| **3** | Baseline order vertical slice | Stage 2 | `backend-core` | - | `code-reviewer` | `COMPLETED` | 1 | `-` |
-| **4** | Optimized reservation, idempotency, NATS & worker | Stage 2, 3 | `backend-core` | `infra-devops` | `code-reviewer` | `PENDING` | 0 | - |
-| **5** | Payment simulator, confirm/fail/timeout/cancel & restock | Stage 3, 4 | `backend-core` | `payment-integrations` | `code-reviewer` | `PENDING` | 0 | - |
-| **6** | SePay adapter thật cho UI | Stage 5 | `payment-integrations` | `backend-core` | `code-reviewer` | `PENDING` | 0 | - |
-| **7** | Observability, metrics, logs & reliability baseline | Stage 3, 4, 5 | `observability-reliability` | `backend-core`, `infra-devops` | `code-reviewer` | `PENDING` | 0 | - |
-| **8** | Frontend product flow & design system | Stage 5 | `frontend-ui` | - | `code-reviewer` | `PENDING` | 0 | - |
-| **9** | War Room dashboard & chaos controller | Stage 7, 8 | `frontend-ui` | `backend-core`, `infra-devops` | `code-reviewer` | `PENDING` | 0 | - |
-| **10** | QA test pyramid, concurrency & invariant verifier | Stage 3–9 | `qa-loadtest` | `backend-core` | `code-reviewer` | `PENDING` | 0 | - |
-| **11** | k6 benchmark & fair comparison | Stage 7, 10 | `qa-loadtest` | `infra-devops` | `code-reviewer` | `PENDING` | 0 | - |
-| **12** | Chaos, resilience, soak & system testing | Stage 7, 9, 10, 11 | `qa-loadtest` | `observability-reliability`, `infra-devops` | `code-reviewer` | `PENDING` | 0 | - |
-| **13** | Demo hardening, evidence pack & context handoff | Stage 11, 12 | `qa-loadtest` | `infra-devops`, `observability-reliability` | `code-reviewer` | `PENDING` | 0 | - |
+| **3** | Baseline order vertical slice | Stage 2 | `backend-core` | - | `code-reviewer` | `COMPLETED` | 1 | `820b61c` |
+| **4** | Optimized reservation, idempotency, NATS & worker | Stage 2, 3 | `backend-core` | `infra-devops` | `code-reviewer` | `COMPLETED` | 0 | `a914a16` |
+| **5** | Payment simulator, confirm/fail/timeout/cancel & restock | Stage 3, 4 | `backend-core` | `payment-integrations` | `code-reviewer` | `COMPLETED` | 1 | `a2b6053` |
+| **6** | SePay adapter thật cho UI | Stage 5 | `payment-integrations` | `backend-core` | `code-reviewer` | `COMPLETED` | 0 | `f2a25ba` |
+| **7** | Observability, metrics, logs & reliability baseline | Stage 3, 4, 5 | `observability-reliability` | `backend-core`, `infra-devops` | `code-reviewer` | `COMPLETED` | 0 | `627f740` |
+| **8** | Frontend product flow & design system | Stage 5 | `frontend-ui` | - | `code-reviewer` | `COMPLETED` | 1 | `85d25ad` |
+| **9** | War Room dashboard & chaos controller | Stage 7, 8 | `frontend-ui` | `backend-core`, `infra-devops` | `code-reviewer` | `COMPLETED` | 1 | `909eaca` |
+| **10** | QA test pyramid, concurrency & invariant verifier | Stage 3–9 | `qa-loadtest` | `backend-core` | `code-reviewer` | `COMPLETED` | 0 | `c5f25b5` |
+| **11** | k6 benchmark & fair comparison | Stage 7, 10 | `qa-loadtest` | `infra-devops` | `code-reviewer` | `COMPLETED` | 0 | `8e9186f` |
+| **12** | Chaos, resilience, soak & system testing | Stage 7, 9, 10, 11 | `qa-loadtest` | `observability-reliability`, `infra-devops` | `code-reviewer` | `COMPLETED` | 0 | `6a26b76` |
+| **13** | Demo hardening, evidence pack & context handoff | Stage 11, 12 | `qa-loadtest` | `infra-devops`, `observability-reliability` | `code-reviewer` | `COMPLETED` | 0 | `56e8ff7` |
 
 ---
 
@@ -169,3 +169,275 @@ docker compose config -q            # PASS (agent verification)
 - ✅ Reset and reconciliation tooling
 
 **Commit SHA:** (pending)
+
+
+### Stage 4: Optimized reservation, idempotency, NATS & worker
+
+**Phase:** COMMITTED  
+**Primary Agent:** backend-core  
+**Deliverables:**
+- Cryptographically random RFC 4122 UUIDv4 generation in `internal/optimized/service.go`
+- `ErrRedisUnavailable` sentinel and HTTP 503 (`service_unavailable`) mapping in `internal/httpapi/optimized_handler.go`
+- Worker daemon wired with PostgreSQL pool, NATS JetStream consumer and signal handling in `cmd/worker/main.go`
+- Inventory reconciliation verifier (`ReconcileItem`, `ReconcileAll`) in `internal/optimized/reconcile.go`
+- Comprehensive unit, integration, and 100-goroutine concurrency tests for Redis Lua reserve/release/confirm, NATS worker persistence/dedup, and race detector verification
+
+**Verification:**
+```bash
+go build ./...                  # PASS
+go vet ./...                    # PASS
+go test -count=1 -race ./...    # PASS
+```
+
+**Acceptance:**
+- ✅ Concurrent reserve does not oversell (Invariant I1)
+- ✅ Same idempotency key performs single reservation (Invariant I3)
+- ✅ Durable JetStream publish and worker `processed_events` deduplication (Invariant I5)
+- ✅ Redis down fails fast with HTTP 503
+- ✅ Reconciliation verifier checks stock equation
+
+**Commit SHA:** `a914a16`
+
+
+### Stage 5: Payment simulator, confirm/fail/timeout/cancel & restock
+
+**Phase:** COMMITTED  
+**Primary Agent:** backend-core  
+**Deliverables:**
+- Shared payment domain DTOs (`SimulatePaymentRequest`, `PaymentResultResponse`) and state machine (`EvaluateTransition`) enforcing valid transitions and D0.7 late-payment refund auditing (`webhook_logs.status='refund'`)
+- Baseline (`BaselineService`) and Optimized (`OptimizedService`) payment processors with row locking, Redis Lua `Confirm`/`Release` idempotency, and atomic `sold_quantity` restock/confirmation
+- Payment Simulator engine (`Simulator`) with configurable ratio distributions and deterministic overrides
+- Expiry sweeper (`ExpirySweeper`) and scheduler daemon (`cmd/scheduler/main.go`)
+- Shared `POST /api/v1/payments/simulate` endpoint on both Baseline (`:8081`) and Optimized (`:8082`)
+- Concurrency stress tests (`TestConcurrency_ConfirmVsCancelVsExpireRace` on Baseline and Optimized) and post-run SQL reconciliation pass
+
+**Verification:**
+```bash
+go build ./...                  # PASS
+go vet ./...                    # PASS
+go test -count=1 -race ./...    # PASS
+bash scripts/reconcile.sql.sh   # PASS
+```
+
+**Acceptance:**
+- ✅ Configurable & deterministic simulator ratios
+- ✅ Each terminal outcome applies at most once (Invariant I2/I4)
+- ✅ Payment failure/timeout/cancel restores stock exactly once
+- ✅ Late payment after expiry keeps order `expired` and records `webhook_logs` status `refund` (D0.7)
+- ✅ Post-run reconciliation passes
+
+**Commit SHA:** `a2b6053`
+
+
+### Stage 6: SePay adapter thật cho UI
+
+**Phase:** COMMITTED  
+**Primary Agent:** payment-integrations  
+**Deliverables:**
+- Provider-isolated SePay adapter (`internal/payments/sepay/adapter.go`) with environment-variable configuration, QR code URL generation, and timing-safe `Apikey`/`Bearer`/`X-Sepay-Signature` verification
+- SePay webhook and initiate HTTP handlers (`internal/httpapi/sepay_webhook_handler.go`) mounted at `POST /api/v1/payments/sepay/initiate` and `POST /api/v1/webhooks/sepay` on both Baseline and Optimized APIs
+- Webhook audit logging (`webhook_logs`) and D0.7 late-payment refund policy integration
+- Webhook test fixtures (`test/fixtures/sepay_webhook_*.json`) and local demo runbook (`docs/runbooks/sepay-local-demo.md`)
+
+**Verification:**
+```bash
+go build ./...                  # PASS
+go vet ./...                    # PASS
+go test -count=1 -race ./...    # PASS
+```
+
+**Acceptance:**
+- ✅ Zero hardcoded credentials in Git (D0.6)
+- ✅ Valid fixture updates order/payment exactly once
+- ✅ Invalid signature rejected with 401 without mutating stock
+- ✅ Duplicate webhook is idempotent
+- ✅ Late payment after expiry follows D0.7 refund policy
+
+**Commit SHA:** `f2a25ba`
+
+
+### Stage 7: Observability, metrics, logs & reliability baseline
+
+**Phase:** COMMITTED  
+**Primary Agent:** observability-reliability  
+**Deliverables:**
+- Zero-dependency Prometheus metrics registry (`CounterVec`, `GaugeVec`, `HistogramVec`, `/metrics` exposition) in `internal/observability/metrics.go` distinguishing `2xx`, `409`, `429`, and `5xx` by `arch` and normalized route
+- Structured JSON `slog` logger, correlation ID HTTP middleware, and NATS header propagation (`InjectNATSCorrelationID`, `ExtractNATSCorrelationID`) in `internal/observability/`
+- Instrumentation wired into `cmd/api-baseline`, `cmd/api-optimized`, and `cmd/worker`
+- Prometheus alert rules (`deploy/prometheus/alerts.yml`), Grafana dashboard provisioning (`deploy/grafana/provisioning/dashboards/apexstock.json`), metric catalog (`docs/observability/metric-catalog.md`), and incident response runbook (`docs/runbooks/incident-response.md`)
+
+**Verification:**
+```bash
+go build ./...                  # PASS
+go vet ./...                    # PASS
+go test -count=1 -race ./...    # PASS
+```
+
+**Acceptance:**
+- ✅ Order trace via `X-Correlation-ID` across HTTP and NATS
+- ✅ Business rejections (`409`/`429`) separated from `5xx` system failures
+- ✅ Latency histograms with `arch` and normalized `route` labels
+- ✅ Non-resetting `apexstock_oversell_total` invariant counter
+- ✅ Grafana dashboard & Prometheus alert rules provisioned
+
+**Commit SHA:** `627f740`
+
+
+### Stage 8: Frontend product flow & design system
+
+**Phase:** COMMITTED  
+**Primary Agent:** frontend-ui  
+**Deliverables:**
+- Backend Catalog & Order Read APIs (`internal/httpapi/catalog_handler.go`: `GET /api/v1/flash-sale/events`, `GET /api/v1/flash-sale/items/{id}`, `GET /api/v1/orders/{id}`) mounted on Baseline and Optimized APIs, plus CORS preflight and route normalization in `internal/observability/middleware.go`
+- Design system tokens (dark/light theme, `prefers-reduced-motion` support) and animated primitives (`ThemeToggle.tsx`, `AuroraHero.tsx`, `SpotlightCard.tsx` using CSS custom properties without React rerender)
+- Typed API client (`web/src/lib/api.ts`) with deterministic idempotency key store and visibility-aware polling hook (`web/src/hooks/usePolling.ts`)
+- Product flow routes (`web/src/app/page.tsx`, `web/src/app/flash-sale/[id]/page.tsx`, `web/src/app/orders/[id]/page.tsx`) supporting Baseline vs Optimized architecture selector, SePay QR generation, and simulator payment triggers
+
+**Verification:**
+```bash
+go build ./...                  # PASS
+go vet ./...                    # PASS
+go test -count=1 -race ./...    # PASS
+cd web && npm run lint          # PASS
+cd web && npm run build         # PASS
+```
+
+**Acceptance:**
+- ✅ End-to-end user demo flow from flash sale catalog → item detail → order → payment QR / simulator → live polling status
+- ✅ Duplicate click prevention via deterministic idempotency key store
+- ✅ Stale/disconnect indicator, theme toggle, reduced-motion, and keyboard navigation
+- ✅ Next.js App Router `[id]` segments and polling per D0.14
+
+**Commit SHA:** `85d25ad`
+
+
+### Stage 9: War Room dashboard & chaos controller
+
+**Phase:** COMMITTED  
+**Primary Agent:** frontend-ui  
+**Deliverables:**
+- War Room Controller service (`internal/warroom/service.go`) polling `/healthz` and `/metrics` from Baseline (`:8081`) and Optimized (`:8082`), computing RPS and `p50`/`p95`/`p99` histogram quantiles, and automatically detecting container/instance down transitions and recovery duration
+- War Room HTTP/SSE handlers (`internal/warroom/handler.go`) and `cmd/warroom-controller/main.go` wiring `/api/v1/warroom/snapshot`, `/api/v1/warroom/stream`, and `/api/v1/warroom/run` (enforcing D0.11 sequential benchmark run state machine and D0.12 zero container-kill endpoints)
+- Operator CLI chaos scripts (`scripts/chaos/{kill,restore}-{optimized,baseline}-api.sh`)
+- Frontend `/war-room` dashboard (`web/src/app/war-room/page.tsx`, `TelemetryPanel.tsx`, `VerdictSummaryModal.tsx`, `ActivityLogPanel.tsx`) with live SSE stream, reconnect indicator, oversell invariant badge, and hypothesis disclaimer
+
+**Verification:**
+```bash
+go build ./...                  # PASS
+go vet ./...                    # PASS
+go test -count=1 -race ./...    # PASS
+bash -n scripts/chaos/*.sh      # PASS
+cd web && npm run lint          # PASS
+cd web && npm run build         # PASS
+```
+
+**Acceptance:**
+- ✅ Idle screen shows Unknown/Healthy accurately
+- ✅ Sequential start/stop state machine & labeled parallel visual demo mode (D0.11)
+- ✅ Zero container kill/pause endpoints exposed to browser (D0.12); operator uses CLI scripts and War Room detects outage/recovery via health polling
+- ✅ Live SSE stream with stale/reconnect marker
+
+**Commit SHA:** `909eaca`
+
+
+### Stage 10: QA test pyramid, concurrency & invariant verifier
+
+**Phase:** COMMITTED  
+**Primary Agent:** qa-loadtest  
+**Deliverables:**
+- Cross-architecture Invariant Verifier (`test/system/invariant_verifier.go`, `test/system/invariant_verifier_test.go`) validating I1 (stock conservation equation `available + reserved + paid == total`, `available >= 0`), I2/I4 (order vs payment terminal state transitions), I3 (idempotency uniqueness), and I5 (`processed_events` deduplication)
+- Common API Contract Test Suite (`test/contract/order_contract_test.go`) verifying `201/400/404/409/503`, `ErrorEnvelope` schema, `X-Correlation-ID` propagation, and D0.4 single-unit enforcement across Baseline and Optimized
+- Security & Boundary Verification Suite (`test/contract/security_test.go`) testing 1MB request body limit, SQL injection payload rejection, and D0.12 zero chaos/container-kill HTTP endpoints
+
+**Verification:**
+```bash
+go build ./...                  # PASS
+go vet ./...                    # PASS
+go test -count=1 -race ./...    # PASS
+```
+
+**Acceptance:**
+- ✅ Invariants I1–I5 verified across both architectures
+- ✅ Contract parity between `:8081` (Baseline) and `:8082` (Optimized)
+- ✅ Security boundary and D0.12 verified
+- ✅ Zero data races under `go test -race ./...`
+
+**Commit SHA:** `c5f25b5`
+
+
+### Stage 11: k6 benchmark & fair comparison
+
+**Phase:** COMMITTED  
+**Primary Agent:** qa-loadtest  
+**Deliverables:**
+- Deterministic k6 User/Idempotency Generators & Response Classifier (`loadtests/lib/generators.js`, `loadtests/lib/assertions.js`) matching `docs/benchmark/benchmark-matrix.yaml` (`33333333-3333-3333-3333-000000000001..50000`) and separating `201` (`SUCCESS`), `409`/`429` (`BUSINESS_REJECTION`), and `5xx`/timeouts (`SYSTEM_FAILURE`)
+- 5 k6 Scenarios (`loadtests/scenarios/{smoke,flash-sale-shock,sustainable-throughput,payment-restock,soak}.js`)
+- Fair Sequential Benchmark Runner & Metadata Collector (`scripts/benchmark/run-benchmark.sh`) enforcing D0.9/D0.10/D0.11 sequential execution, environment metadata provenance (`metadata.json`), and post-run invariant verification
+- Empirical Report Template (`docs/benchmark/report-template.md`) and Measurement Provenance rules (`docs/benchmark/measurement-provenance.md`)
+
+**Verification:**
+```bash
+node --check loadtests/lib/*.js loadtests/scenarios/*.js  # PASS
+bash -n scripts/benchmark/run-benchmark.sh                # PASS
+go test -count=1 -race ./...                              # PASS
+```
+
+**Acceptance:**
+- ✅ Identical k6 script targets Baseline (`:8081`) and Optimized (`:8082`) with identical payload
+- ✅ Sequential execution with reset/seed/warm-up/cooldown per run (D0.11)
+- ✅ Post-run invariant verification gate
+- ✅ Hypothesis numbers explicitly separated from measured results (D0.10)
+
+**Commit SHA:** `8e9186f`
+
+
+### Stage 12: Chaos, resilience, soak & system testing
+
+**Phase:** COMMITTED  
+**Primary Agent:** qa-loadtest  
+**Deliverables:**
+- Resilience & Fault Injection Automated Tests (`test/system/chaos_resilience_test.go`) covering Redis outage 503 circuit-breaking (`InProcess_CircuitBreaker503`), payment vs expiry race atomic serialization (`TestChaos_PaymentExpiryRace_AtomicSerialization`), and NATS redelivery `processed_events` deduplication (`TestChaos_NATSRedelivery_IdempotentDeduplication`)
+- Operator Chaos Drill & System E2E Smoke Runner (`scripts/chaos/redis-restart-drill.sh` with `trap cleanup EXIT SIGINT SIGTERM`, `scripts/system/e2e-smoke.sh`)
+- Chaos Report Template (`docs/benchmark/chaos-report-template.md`) and Recovery Checklist (`docs/runbooks/recovery-checklist.md`)
+
+**Verification:**
+```bash
+bash -n scripts/chaos/*.sh scripts/system/*.sh  # PASS
+go test -count=1 -race ./...                    # PASS
+```
+
+**Acceptance:**
+- ✅ Redis outage fails fast with HTTP 503 without overselling
+- ✅ NATS redelivery before ACK does not duplicate side effects
+- ✅ Payment vs expiry race serializes deterministically
+- ✅ Chaos scripts guarantee automatic cleanup via signal traps
+
+**Commit SHA:** `6a26b76`
+
+
+### Stage 13: Demo hardening, evidence pack & context handoff
+
+**Phase:** COMMITTED  
+**Primary Agent:** qa-loadtest  
+**Deliverables:**
+- Demo Day Runbook (`docs/runbooks/demo-day.md`), Full Rehearsal Script (`scripts/demo/rehearsal.sh`), and Known Limitations Register (`docs/known-limitations.md`)
+- Evidence pack directory skeleton (`docs/benchmark/results/.gitkeep`, `loadtests/results/.gitkeep`)
+- Comprehensive One-Command Quickstart (`README.md`) and Context Handoff Guide (`docs/handoff.md`) summarizing D0.1–D0.15, service ports, verification commands, and maintenance procedures
+
+**Verification:**
+```bash
+bash -n scripts/demo/rehearsal.sh  # PASS
+go build ./...                     # PASS
+go vet ./...                       # PASS
+go test -count=1 -race ./...       # PASS
+cd web && npm run build            # PASS
+docker compose -f deploy/compose/docker-compose.yaml config -q  # PASS
+```
+
+**Acceptance:**
+- ✅ One-command startup, seed, smoke, and reset documented in `README.md`
+- ✅ Hypothesis targets clearly distinguished from empirical run artifacts (D0.10)
+- ✅ Zero secrets or exposed Docker sockets in default profiles (D0.6, D0.12)
+- ✅ Full context handoff in `docs/handoff.md`
+
+**Commit SHA:** `56e8ff7`

@@ -1,0 +1,14 @@
+{
+  "id": 987655,
+  "gateway": "Vietcombank",
+  "transactionDate": "2026-10-25 10:25:00",
+  "accountNumber": "0123456789",
+  "code": null,
+  "content": "DH 99999999-9999-9999-9999-999999999999",
+  "transferType": "in",
+  "transferAmount": 100000,
+  "accumulated": 5100000,
+  "subAccount": null,
+  "referenceCode": "FT24298123456790",
+  "description": "Thanh toan muon cho don da het han"
+}
