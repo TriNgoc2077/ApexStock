@@ -1,0 +1,50 @@
+groups:
+  - name: apexstock_critical
+    rules:
+      - alert: OversellDetected
+        expr: oversell_total > 0
+        for: 0s
+        labels:
+          severity: critical
+          team: platform
+        annotations:
+          summary: "CRITICAL: Inventory oversell invariant violated!"
+          description: "Flash sale item {{ $labels.item_id }} has sold quantity exceeding total available inventory. Immediate investigation required."
+
+      - alert: ServiceDown
+        expr: up == 0
+        for: 30s
+        labels:
+          severity: critical
+        annotations:
+          summary: "Service instance down"
+          description: "Job {{ $labels.job }} instance {{ $labels.instance }} has been unreachable for > 30 seconds."
+
+  - name: apexstock_reliability
+    rules:
+      - alert: HighHttp5xxRate
+        expr: (sum(rate(http_requests_total{status=~"5.."}[1m])) / sum(rate(http_requests_total[1m]))) > 0.01
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "HTTP 5xx error rate exceeds 1%"
+          description: "5xx server errors account for {{ $value | humanizePercentage }} of traffic on {{ $labels.arch }}."
+
+      - alert: HighP99LatencyOptimized
+        expr: histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket{arch="optimized"}[1m])) by (le)) > 0.2
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Optimized p99 latency > 200ms"
+          description: "p99 latency for Optimized path is currently {{ $value | humanizeDuration }}."
+
+      - alert: NATSQueueBacklogHigh
+        expr: nats_queue_lag > 1000
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "NATS JetStream backlog exceeds 1,000 messages"
+          description: "Stream {{ $labels.stream }} has {{ $value }} pending unconsumed messages."
