@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"os"
 	"testing"
 	"time"
@@ -90,7 +91,7 @@ func TestBaseline_ConfirmPayment_MarksPaidAndKeepsStock(t *testing.T) {
 	res, err := svc.Process(context.Background(), ProcessPaymentRequest{
 		OrderID:      orderID,
 		Outcome:      OutcomeSuccess,
-		ProviderTxID: "tx-success-1",
+		ProviderTxID: fmt.Sprintf("tx-success-%d", time.Now().UnixNano()),
 		Provider:     "simulator",
 	})
 	if err != nil {
@@ -131,7 +132,7 @@ func TestBaseline_FailPayment_RestocksSoldQuantity(t *testing.T) {
 	res, err := svc.Process(context.Background(), ProcessPaymentRequest{
 		OrderID:      orderID,
 		Outcome:      OutcomeFailure,
-		ProviderTxID: "tx-fail-1",
+		ProviderTxID: fmt.Sprintf("tx-fail-%d", time.Now().UnixNano()),
 		Provider:     "simulator",
 	})
 	if err != nil {
@@ -164,7 +165,7 @@ func TestBaseline_LatePayment_RecordsWebhookRefundLog(t *testing.T) {
 	res, err := svc.Process(context.Background(), ProcessPaymentRequest{
 		OrderID:      orderID,
 		Outcome:      OutcomeSuccess,
-		ProviderTxID: "tx-late-1",
+		ProviderTxID: fmt.Sprintf("tx-late-%d", time.Now().UnixNano()),
 		Provider:     "simulator",
 	})
 	if !errors.Is(err, ErrOrderExpiredRefund) {

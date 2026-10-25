@@ -2,7 +2,9 @@ package payments
 
 import (
 	"context"
+	"crypto/rand"
 	"database/sql"
+	"fmt"
 	"os"
 	"testing"
 	"time"
@@ -11,6 +13,16 @@ import (
 	_ "github.com/lib/pq"
 	"github.com/redis/go-redis/v9"
 )
+
+func newTestUUID() string {
+	var b [16]byte
+	if _, err := rand.Read(b[:]); err != nil {
+		return fmt.Sprintf("%08x-%04x-4000-8000-%012x", time.Now().UnixNano()>>32, time.Now().UnixNano()&65535, time.Now().UnixNano()&0xffffffffffff)
+	}
+	b[6] = (b[6] & 0x0f) | 0x40
+	b[8] = (b[8] & 0x3f) | 0x80
+	return fmt.Sprintf("%08x-%04x-%04x-%04x-%012x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:16])
+}
 
 func getOptimizedTestInfra(t *testing.T) (*sql.DB, *redis.Client) {
 	dsn := os.Getenv("OPTIMIZED_DSN")
@@ -41,8 +53,8 @@ func setupTestOptimizedOrder(t *testing.T, db *sql.DB, rdb *redis.Client, status
 	_ = db.QueryRowContext(ctx, `SELECT id FROM flash_sale_items LIMIT 1`).Scan(&itemID)
 	_ = db.QueryRowContext(ctx, `SELECT id FROM users LIMIT 1`).Scan(&userID)
 
-	reservationID = "res-" + time.Now().Format("20060102150405.000000000")
-	orderID = "ord-" + time.Now().Format("20060102150405.000000000")
+	reservationID = newTestUUID()
+	orderID = newTestUUID()
 	expiresAt := time.Now().UTC().Add(5 * time.Minute)
 	if status == OrderStatusExpired {
 		expiresAt = time.Now().UTC().Add(-5 * time.Minute)
@@ -51,7 +63,7 @@ func setupTestOptimizedOrder(t *testing.T, db *sql.DB, rdb *redis.Client, status
 	// Insert in DB
 	_, err := db.ExecContext(ctx, `
 		INSERT INTO orders (id, user_id, idempotency_key, status, total_amount, expires_at)
-		VALUES ($1, $2, $1, $3, 100000, $4)`, orderID, userID, status, expiresAt)
+		VALUES ($1, $2, $3, $4, 100000, $5)`, orderID, userID, orderID, status, expiresAt)
 	if err != nil {
 		t.Fatalf("failed to insert order: %v", err)
 	}
@@ -100,7 +112,7 @@ func TestOptimized_ConfirmPayment_CallsLuaConfirmAndIncrementsDBSold(t *testing.
 	res, err := svc.Process(context.Background(), ProcessPaymentRequest{
 		OrderID:      orderID,
 		Outcome:      OutcomeSuccess,
-		ProviderTxID: "tx-opt-confirm-1",
+		ProviderTxID: fmt.Sprintf("tx-opt-confirm-%d", time.Now().UnixNano()),
 		Provider:     "simulator",
 	})
 	if err != nil {
@@ -138,7 +150,7 @@ func TestOptimized_FailPayment_ReleasesRedisStockAndUserQuota(t *testing.T) {
 	res, err := svc.Process(context.Background(), ProcessPaymentRequest{
 		OrderID:      orderID,
 		Outcome:      OutcomeFailure,
-		ProviderTxID: "tx-opt-fail-1",
+		ProviderTxID: fmt.Sprintf("tx-opt-fail-%d", time.Now().UnixNano()),
 		Provider:     "simulator",
 	})
 	if err != nil {
@@ -215,8 +227,8 @@ func TestOptimized_WorkerPersistenceLag_RetrySucceeds(t *testing.T) {
 	_ = db.QueryRowContext(ctx, `SELECT id FROM flash_sale_items LIMIT 1`).Scan(&itemID)
 	_ = db.QueryRowContext(ctx, `SELECT id FROM users LIMIT 1`).Scan(&userID)
 
-	orderID := "ord-lag-" + time.Now().Format("20060102150405.000000000")
-	reservationID := "res-lag-" + time.Now().Format("20060102150405.000000000")
+	orderID := newTestUUID()
+	reservationID := newTestUUID()
 	expiresAt := time.Now().UTC().Add(5 * time.Minute)
 
 	// Simulate reservation in Redis immediately
@@ -237,7 +249,7 @@ func TestOptimized_WorkerPersistenceLag_RetrySucceeds(t *testing.T) {
 		time.Sleep(120 * time.Millisecond)
 		_, _ = db.ExecContext(context.Background(), `
 			INSERT INTO orders (id, user_id, idempotency_key, status, total_amount, expires_at)
-			VALUES ($1, $2, $1, 'pending_payment', 100000, $3)`, orderID, userID, expiresAt)
+			VALUES ($1, $2, $3, 'pending_payment', 100000, $4)`, orderID, userID, orderID, expiresAt)
 		_, _ = db.ExecContext(context.Background(), `
 			INSERT INTO order_items (id, order_id, flash_sale_item_id, product_id, quantity, unit_price)
 			SELECT $1, $2, id, product_id, 1, sale_price FROM flash_sale_items WHERE id = $3`, reservationID, orderID, itemID)
@@ -250,7 +262,7 @@ func TestOptimized_WorkerPersistenceLag_RetrySucceeds(t *testing.T) {
 	res, err := svc.Process(context.Background(), ProcessPaymentRequest{
 		OrderID:      orderID,
 		Outcome:      OutcomeSuccess,
-		ProviderTxID: "tx-lag-success",
+		ProviderTxID: fmt.Sprintf("tx-lag-success-%d", time.Now().UnixNano()),
 	})
 	if err != nil {
 		t.Fatalf("expected bounded retry to succeed despite worker lag, got: %v", err)

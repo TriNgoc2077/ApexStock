@@ -79,10 +79,13 @@ func (s *OptimizedService) Process(ctx context.Context, req ProcessPaymentReques
 			"reason":         "late payment on expired order",
 			"received_at":    time.Now().UTC(),
 		})
-		_, _ = s.db.ExecContext(ctx, `
+		_, err := s.db.ExecContext(ctx, `
 			INSERT INTO webhook_logs (order_id, provider, transaction_ref, status, payload)
 			VALUES ($1, $2, $3, 'refund', $4)`,
 			req.OrderID, req.Provider, req.ProviderTxID, payload)
+		if err != nil {
+			return PaymentResult{}, err
+		}
 
 		return PaymentResult{
 			OrderID:          req.OrderID,
@@ -134,6 +137,26 @@ func (s *OptimizedService) Process(ctx context.Context, req ProcessPaymentReques
 		return PaymentResult{}, err
 	}
 	defer tx.Rollback()
+
+	// Guard against concurrent calls on the same order
+	var currentStatusInTx string
+	err = tx.QueryRowContext(ctx, `SELECT status::text FROM orders WHERE id = $1 FOR UPDATE`, req.OrderID).Scan(&currentStatusInTx)
+	if err != nil {
+		return PaymentResult{}, err
+	}
+	if currentStatusInTx != OrderStatusPendingPayment {
+		if currentStatusInTx == decision.TargetOrderStatus {
+			_ = tx.Commit()
+			return PaymentResult{
+				OrderID:          req.OrderID,
+				OrderStatus:      currentStatusInTx,
+				PaymentStatus:    decision.TargetPaymentStatus,
+				IdempotentReplay: true,
+				Restocked:        false,
+			}, nil
+		}
+		return PaymentResult{}, ErrInvalidStateTransition
+	}
 
 	_, err = tx.ExecContext(ctx, `
 		UPDATE orders SET status = $1, updated_at = now() WHERE id = $2`,
