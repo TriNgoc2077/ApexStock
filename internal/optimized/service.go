@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"sync"
 	"time"
 
 	"apexstock/internal/domain"
@@ -42,26 +43,99 @@ type item struct {
 	Start, End time.Time
 	Status     string
 }
+
+type cachedItem struct {
+	it        item
+	expiresAt time.Time
+}
+
 type Service struct {
 	db   *sql.DB
 	rdb  *redis.Client
 	nats *messaging.Client
 	ttl  time.Duration
+
+	itemCacheMu sync.RWMutex
+	itemCache   map[string]cachedItem
+
+	soldOutMu    sync.RWMutex
+	soldOutUntil map[string]time.Time
 }
 
 func NewService(db *sql.DB, rdb *redis.Client, nc *messaging.Client) *Service {
-	return &Service{db: db, rdb: rdb, nats: nc, ttl: 5 * time.Minute}
-}
-func (s *Service) Create(ctx context.Context, req domain.CreateOrderRequest) (domain.OrderResponse, error) {
-	var it item
-	err := s.db.QueryRowContext(ctx, `SELECT fsi.product_id,fsi.sale_price,fsi.max_per_user,fsi.total_quantity,fsi.sold_quantity,fse.start_time,fse.end_time,fse.status::text FROM flash_sale_items fsi JOIN flash_sale_events fse ON fse.id=fsi.event_id WHERE fsi.id=$1`, req.FlashSaleItemID).Scan(&it.ProductID, &it.Price, &it.Max, &it.Total, &it.Sold, &it.Start, &it.End, &it.Status)
-	if errors.Is(err, sql.ErrNoRows) {
-		return domain.OrderResponse{}, ErrItemNotFound
+	return &Service{
+		db:           db,
+		rdb:          rdb,
+		nats:         nc,
+		ttl:          5 * time.Minute,
+		itemCache:    make(map[string]cachedItem),
+		soldOutUntil: make(map[string]time.Time),
 	}
+}
+
+func (s *Service) isSoldOutFast(itemID string, now time.Time) bool {
+	s.soldOutMu.RLock()
+	until, ok := s.soldOutUntil[itemID]
+	s.soldOutMu.RUnlock()
+	return ok && now.Before(until)
+}
+
+func (s *Service) markSoldOut(itemID string, now time.Time, duration time.Duration) {
+	s.soldOutMu.Lock()
+	s.soldOutUntil[itemID] = now.Add(duration)
+	s.soldOutMu.Unlock()
+}
+
+func (s *Service) clearSoldOut(itemID string) {
+	s.soldOutMu.Lock()
+	delete(s.soldOutUntil, itemID)
+	s.soldOutMu.Unlock()
+}
+
+func (s *Service) getItem(ctx context.Context, itemID string) (item, error) {
+	s.itemCacheMu.RLock()
+	c, ok := s.itemCache[itemID]
+	s.itemCacheMu.RUnlock()
+
+	now := time.Now()
+	if ok && now.Before(c.expiresAt) {
+		return c.it, nil
+	}
+
+	var it item
+	err := s.db.QueryRowContext(ctx, `SELECT fsi.product_id,fsi.sale_price,fsi.max_per_user,fsi.total_quantity,fsi.sold_quantity,fse.start_time,fse.end_time,fse.status::text FROM flash_sale_items fsi JOIN flash_sale_events fse ON fse.id=fsi.event_id WHERE fsi.id=$1`, itemID).Scan(&it.ProductID, &it.Price, &it.Max, &it.Total, &it.Sold, &it.Start, &it.End, &it.Status)
+	if errors.Is(err, sql.ErrNoRows) {
+		return item{}, ErrItemNotFound
+	}
+	if err != nil {
+		if ok {
+			return c.it, nil // Stale cache fallback if database is under pressure
+		}
+		return item{}, err
+	}
+
+	s.itemCacheMu.Lock()
+	s.itemCache[itemID] = cachedItem{
+		it:        it,
+		expiresAt: now.Add(1 * time.Minute),
+	}
+	s.itemCacheMu.Unlock()
+
+	return it, nil
+}
+
+func (s *Service) Create(ctx context.Context, req domain.CreateOrderRequest) (domain.OrderResponse, error) {
+	now := time.Now().UTC()
+
+	// Fast Path: If item is known to be sold out, reject immediately in memory (0 Redis roundtrip)
+	if s.isSoldOutFast(req.FlashSaleItemID, now) {
+		return domain.OrderResponse{}, ErrOutOfStock
+	}
+
+	it, err := s.getItem(ctx, req.FlashSaleItemID)
 	if err != nil {
 		return domain.OrderResponse{}, err
 	}
-	now := time.Now().UTC()
 	if it.Status != "active" || now.Before(it.Start) || !now.Before(it.End) {
 		return domain.OrderResponse{}, ErrItemNotFound
 	}
@@ -86,6 +160,8 @@ func (s *Service) Create(ctx context.Context, req domain.CreateOrderRequest) (do
 		return domain.OrderResponse{}, ErrItemNotFound
 	}
 	if code == "-2" {
+		// Mark sold out for 3 seconds in RAM for fast rejection
+		s.markSoldOut(req.FlashSaleItemID, now, 3*time.Second)
 		return domain.OrderResponse{}, ErrOutOfStock
 	}
 	if code == "-3" {
@@ -94,6 +170,10 @@ func (s *Service) Create(ctx context.Context, req domain.CreateOrderRequest) (do
 	if code == "-4" {
 		return domain.OrderResponse{}, ErrIdempotencyConflict
 	}
+
+	// Successful reservation (new or idempotent replay): clear sold-out flag
+	s.clearSoldOut(req.FlashSaleItemID)
+
 	response := domain.OrderResponse{OrderID: fmt.Sprint(a[2]), ReservationID: fmt.Sprint(a[1]), UserID: fmt.Sprint(a[4]), FlashSaleItemID: fmt.Sprint(a[3]), Quantity: atoi32(a[5]), TotalAmount: atoi64(a[8]), Status: "pending_payment", PaymentStatus: "pending", ExpiresAt: time.Unix(atoi64(a[6]), 0).UTC(), CreatedAt: parseTime(fmt.Sprint(a[9])), Idempotent: code == "1"}
 	if !response.Idempotent {
 		event := messaging.OrderReserved{EventID: response.OrderID, OrderID: response.OrderID, ReservationID: response.ReservationID, UserID: response.UserID, ItemID: response.FlashSaleItemID, ProductID: it.ProductID, Quantity: response.Quantity, TotalAmount: response.TotalAmount, ExpiresAt: response.ExpiresAt, CreatedAt: response.CreatedAt, IdempotencyKey: req.IdempotencyKey}

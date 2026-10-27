@@ -29,7 +29,13 @@ echo "3. Testing Baseline & Optimized Order Checkout..."
 ./scripts/system/e2e-smoke.sh
 
 echo "4. Running Quick Smoke Benchmark (10 VUs, 10s)..."
-k6 run -e TARGET_URL="http://localhost:8082" --duration 10s --vus 10 loadtests/scenarios/smoke.js
+if command -v k6 >/dev/null 2>&1; then
+  k6 run -e TARGET_URL="http://localhost:8082" --duration 10s --vus 10 loadtests/scenarios/smoke.js
+elif command -v docker >/dev/null 2>&1; then
+  docker run --rm -i --network host -v "$ROOT_DIR:/work" -w /work grafana/k6:latest run -e TARGET_URL="http://localhost:8082" --duration 10s --vus 10 loadtests/scenarios/smoke.js
+else
+  echo "k6 not found, skipping benchmark"
+fi
 
 echo "5. Verifying Invariants Post-Rehearsal..."
 go test -v ./test/system -run TestInvariantVerifier_StockEquation_Calculation

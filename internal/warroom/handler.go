@@ -106,6 +106,16 @@ func (h *Handler) HandleRun(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if req.Mode == "idle" || req.Mode == "stop" || req.Mode == "reset" {
+		h.svc.SetRunState("idle", true, "")
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"status": "idle",
+		})
+		return
+	}
+
 	runID := fmt.Sprintf("run-%d", time.Now().Unix())
 	isBenchmark := true
 	label := "BENCHMARK_OFFICIAL_EVALUATION"
@@ -116,6 +126,16 @@ func (h *Handler) HandleRun(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.svc.SetRunState("running_"+req.Mode, isBenchmark, runID)
+
+	dur, err := time.ParseDuration(req.Duration)
+	if err != nil || dur <= 0 {
+		dur = 60 * time.Second
+	}
+
+	go func(id string, isBench bool, d time.Duration) {
+		time.Sleep(d)
+		h.svc.SetRunState("finished", isBench, id)
+	}(runID, isBenchmark, dur)
 
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Access-Control-Allow-Origin", "*")

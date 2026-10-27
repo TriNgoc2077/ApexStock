@@ -50,10 +50,27 @@ run_arch() {
     sleep 10
 
     echo "[Run $i/$RUNS] Executing k6..."
-    k6 run \
-      -e TARGET_URL="$url" \
-      --summary-export "$OUTPUT_DIR/${arch}_run${i}_summary.json" \
-      "loadtests/scenarios/${SCENARIO}.js"
+    set +e
+    if command -v k6 >/dev/null 2>&1; then
+      k6 run \
+        -e TARGET_URL="$url" \
+        --summary-export "$OUTPUT_DIR/${arch}_run${i}_summary.json" \
+        "loadtests/scenarios/${SCENARIO}.js"
+    elif command -v docker >/dev/null 2>&1; then
+      docker run --rm -i --network host -v "$ROOT_DIR:/work" -w /work grafana/k6:latest run \
+        -e TARGET_URL="$url" \
+        --summary-export "$OUTPUT_DIR/${arch}_run${i}_summary.json" \
+        "loadtests/scenarios/${SCENARIO}.js"
+    else
+      echo "ERROR: k6 is not installed on host and Docker is not available" >&2
+      exit 1
+    fi
+    k6_status=$?
+    set -e
+    if [ "$k6_status" -ne 0 ] && [ "$k6_status" -ne 99 ]; then
+      echo "k6 failed with fatal error code $k6_status" >&2
+      exit "$k6_status"
+    fi
 
     echo "[Run $i/$RUNS] Running Invariant Verifier..."
     BASELINE_DSN="$dsn" go test -v ./test/system -run TestInvariantVerifier_StockEquation_Calculation

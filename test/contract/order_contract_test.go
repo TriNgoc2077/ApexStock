@@ -82,7 +82,7 @@ func TestOrderContract_NonExistentItem_Returns404WithEnvelope(t *testing.T) {
 	for _, target := range getAPIBaseURLs() {
 		t.Run(target.name, func(t *testing.T) {
 			body := []byte(`{
-				"user_id": "00000000-0000-0000-0000-000000000001",
+				"user_id": "33333333-3333-3333-3333-000000000001",
 				"flash_sale_item_id": "ffffffff-ffff-ffff-ffff-ffffffffffff",
 				"quantity": 1,
 				"idempotency_key": "contract-404-test"

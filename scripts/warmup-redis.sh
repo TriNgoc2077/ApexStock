@@ -10,8 +10,36 @@ set -euo pipefail
 : "${REDIS_HOST:=redis}"
 : "${REDIS_PORT:=6379}"
 
-PGPASSWORD="$POSTGRES_PASSWORD" psql -At -F '|' \
-  -h "$POSTGRES_HOST" -p "$POSTGRES_PORT" -U "$POSTGRES_USER" -d apexstock_optimized <<'SQL' |
+ROOT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+COMPOSE_FILE="$ROOT_DIR/deploy/compose/docker-compose.yaml"
+
+run_psql() {
+    local db="$1"
+    shift
+    if command -v psql >/dev/null 2>&1 && getent hosts "$POSTGRES_HOST" >/dev/null 2>&1; then
+        PGPASSWORD="$POSTGRES_PASSWORD" psql -h "$POSTGRES_HOST" -p "$POSTGRES_PORT" -U "$POSTGRES_USER" -d "$db" "$@"
+    elif command -v psql >/dev/null 2>&1 && [ "$POSTGRES_HOST" = "postgres" ] && (nc -z localhost 5432 2>/dev/null || (exec 3<>/dev/tcp/localhost/5432) 2>/dev/null); then
+        PGPASSWORD="$POSTGRES_PASSWORD" psql -h localhost -p 5432 -U "$POSTGRES_USER" -d "$db" "$@"
+    elif command -v docker >/dev/null 2>&1 && docker compose -f "$COMPOSE_FILE" ps postgres -q 2>/dev/null | grep -q .; then
+        docker compose -f "$COMPOSE_FILE" exec -T -e PGPASSWORD="$POSTGRES_PASSWORD" postgres psql -U "$POSTGRES_USER" -d "$db" "$@"
+    else
+        PGPASSWORD="$POSTGRES_PASSWORD" psql -h "$POSTGRES_HOST" -p "$POSTGRES_PORT" -U "$POSTGRES_USER" -d "$db" "$@"
+    fi
+}
+
+run_redis() {
+    if command -v redis-cli >/dev/null 2>&1 && getent hosts "$REDIS_HOST" >/dev/null 2>&1; then
+        redis-cli -h "$REDIS_HOST" -p "$REDIS_PORT" "$@"
+    elif command -v redis-cli >/dev/null 2>&1 && [ "$REDIS_HOST" = "redis" ] && (nc -z localhost 6379 2>/dev/null || (exec 3<>/dev/tcp/localhost/6379) 2>/dev/null); then
+        redis-cli -h localhost -p 6379 "$@"
+    elif command -v docker >/dev/null 2>&1 && docker compose -f "$COMPOSE_FILE" ps redis -q 2>/dev/null | grep -q .; then
+        docker compose -f "$COMPOSE_FILE" exec -T redis redis-cli "$@"
+    else
+        redis-cli -h "$REDIS_HOST" -p "$REDIS_PORT" "$@"
+    fi
+}
+
+run_psql apexstock_optimized -At -F '|' <<'SQL' |
 WITH active_items AS (
   SELECT fsi.id, fsi.total_quantity, fsi.sold_quantity
   FROM flash_sale_items fsi
@@ -34,14 +62,13 @@ while IFS='|' read -r item total sold reserved; do
     echo "ERROR: negative reconstructed stock for item $item" >&2
     exit 1
   fi
-  redis-cli -h "$REDIS_HOST" -p "$REDIS_PORT" SET "flash_item:$item:stock" "$stock" >/dev/null
-  redis-cli -h "$REDIS_HOST" -p "$REDIS_PORT" DEL "flash_item:$item:reserved" >/dev/null
+  run_redis SET "flash_item:$item:stock" "$stock" >/dev/null
+  run_redis DEL "flash_item:$item:reserved" >/dev/null
   echo "SET flash_item:$item:stock=$stock (reserved=$reserved)"
 done
 
 # Rebuild reservation members and per-user counters in one pass.
-PGPASSWORD="$POSTGRES_PASSWORD" psql -At -F '|' \
-  -h "$POSTGRES_HOST" -p "$POSTGRES_PORT" -U "$POSTGRES_USER" -d apexstock_optimized <<'SQL' |
+run_psql apexstock_optimized -At -F '|' <<'SQL' |
 SELECT oi.flash_sale_item_id, EXTRACT(EPOCH FROM o.expires_at)::bigint,
        o.id::text || ':' || o.user_id::text || ':' || oi.quantity::text,
        o.user_id, oi.quantity
@@ -50,8 +77,8 @@ WHERE o.status = 'pending_payment' AND o.expires_at > now();
 SQL
 while IFS='|' read -r item expiry member user_id qty; do
   [ -z "$item" ] && continue
-  redis-cli -h "$REDIS_HOST" -p "$REDIS_PORT" ZADD "flash_item:$item:reserved" "$expiry" "$member" >/dev/null
-  redis-cli -h "$REDIS_HOST" -p "$REDIS_PORT" INCRBY "flash_item:$item:user:$user_id" "$qty" >/dev/null
+  run_redis ZADD "flash_item:$item:reserved" "$expiry" "$member" >/dev/null
+  run_redis INCRBY "flash_item:$item:user:$user_id" "$qty" >/dev/null
 done
 
 echo "Redis warm-up complete"
