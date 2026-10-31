@@ -42,7 +42,7 @@ run_redis() {
 
 DBS=("apexstock_baseline" "apexstock_optimized")
 ITEM_ID="22222222-2222-2222-2222-222222222222"
-INITIAL_STOCK=10000
+INITIAL_STOCK="${INITIAL_STOCK:-10000}"
 
 echo "==> Resetting databases and Redis to baseline"
 
@@ -59,7 +59,7 @@ for DB in "${DBS[@]}"; do
 
         -- Reset flash sale item stock to initial
         UPDATE flash_sale_items
-        SET sold_quantity = 0
+        SET sold_quantity = 0, total_quantity = $INITIAL_STOCK
         WHERE id = '$ITEM_ID';
 
         -- Keep users, products, flash_sale_events, flash_sale_items
@@ -69,12 +69,16 @@ done
 
 # Reset Redis (optimized only)
 echo "==> Flushing Redis inventory/idempotency keys"
-run_redis DEL "flash_item:$ITEM_ID:stock" "flash_item:$ITEM_ID:reserved" >/dev/null
-run_redis EVAL \
-    "local keys = redis.call('keys', 'flash_item:$ITEM_ID:user:*'); for i=1,#keys,5000 do redis.call('del', unpack(keys, i, math.min(i+4999, #keys))) end; return #keys" 0 >/dev/null
-run_redis EVAL \
-    "local keys = redis.call('keys', 'idempotency:*'); for i=1,#keys,5000 do redis.call('del', unpack(keys, i, math.min(i+4999, #keys))) end; return #keys" 0 >/dev/null
+run_redis FLUSHDB >/dev/null
 run_redis SET "flash_item:$ITEM_ID:stock" "$INITIAL_STOCK" >/dev/null
+
+# Purge JetStream backlog so leftover/poison events from earlier runs don't leak into this one
+echo "==> Purging NATS stream FLASHSALE_ORDERS"
+if command -v nats >/dev/null 2>&1; then
+    nats --server nats://localhost:4222 stream purge FLASHSALE_ORDERS -f >/dev/null 2>&1 || echo "    ! NATS purge failed (ignored)"
+elif command -v docker >/dev/null 2>&1; then
+    docker run --rm --network host natsio/nats-box:latest nats --server nats://localhost:4222 stream purge FLASHSALE_ORDERS -f >/dev/null 2>&1 || echo "    ! NATS purge failed (ignored)"
+fi
 
 echo "    ✓ Redis reset and stock initialized to $INITIAL_STOCK"
 

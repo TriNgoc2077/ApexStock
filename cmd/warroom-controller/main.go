@@ -22,7 +22,7 @@ func main() {
 
 	optimizedURL := os.Getenv("OPTIMIZED_METRICS_URL")
 	if optimizedURL == "" {
-		optimizedURL = "http://nginx:8082"
+		optimizedURL = "http://api-optimized:8082"
 	}
 
 	port := os.Getenv("WARROOM_PORT")

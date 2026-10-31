@@ -11,6 +11,22 @@ cd "$ROOT_DIR"
 RUN_ID="run-$(date +%Y%m%d-%H%M%S)"
 OUTPUT_DIR="loadtests/results/$RUN_ID"
 mkdir -p "$OUTPUT_DIR"
+chmod 777 "$OUTPUT_DIR"
+
+# Stock/limit sized to the load profile. sustainable-throughput sends ~59 x PEAK_RPS requests
+# (default PEAK_RPS=2000 -> ~118000), so seed 60 x PEAK_RPS to avoid sold-out 409s distorting RPS.
+# Override with BENCH_STOCK / BENCH_MAX_PER_USER. Other scenarios keep seed defaults.
+PEAK_RPS="${PEAK_RPS:-2000}"
+# Redis budget (512MB, noeviction) fits ~460k reservations (~2 keys/order), so cap stock at 350k by default.
+DEFAULT_STOCK=$((PEAK_RPS * 60))
+[ "$DEFAULT_STOCK" -gt 350000 ] && DEFAULT_STOCK=350000
+if [ "$SCENARIO" = "sustainable-throughput" ]; then
+  export INITIAL_STOCK="${BENCH_STOCK:-$DEFAULT_STOCK}"
+  export MAX_PER_USER="${BENCH_MAX_PER_USER:-100000000}"
+elif [ -n "${BENCH_STOCK:-}" ]; then
+  export INITIAL_STOCK="$BENCH_STOCK"
+  [ -n "${BENCH_MAX_PER_USER:-}" ] && export MAX_PER_USER="$BENCH_MAX_PER_USER"
+fi
 
 echo "=========================================================="
 echo " ApexStock Sequential Benchmark: $SCENARIO ($RUNS runs)"
@@ -53,12 +69,12 @@ run_arch() {
     set +e
     if command -v k6 >/dev/null 2>&1; then
       k6 run \
-        -e TARGET_URL="$url" \
+        -e TARGET_URL="$url" -e PEAK_RPS="$PEAK_RPS" \
         --summary-export "$OUTPUT_DIR/${arch}_run${i}_summary.json" \
         "loadtests/scenarios/${SCENARIO}.js"
     elif command -v docker >/dev/null 2>&1; then
-      docker run --rm -i --network host -v "$ROOT_DIR:/work" -w /work grafana/k6:latest run \
-        -e TARGET_URL="$url" \
+      docker run --rm -i --user "$(id -u):$(id -g)" --network host -v "$ROOT_DIR:/work" -w /work grafana/k6:latest run \
+        -e TARGET_URL="$url" -e PEAK_RPS="$PEAK_RPS" \
         --summary-export "$OUTPUT_DIR/${arch}_run${i}_summary.json" \
         "loadtests/scenarios/${SCENARIO}.js"
     else
@@ -70,6 +86,11 @@ run_arch() {
     if [ "$k6_status" -ne 0 ] && [ "$k6_status" -ne 99 ]; then
       echo "k6 failed with fatal error code $k6_status" >&2
       exit "$k6_status"
+    fi
+
+    summary="$OUTPUT_DIR/${arch}_run${i}_summary.json"
+    if [ -f "$summary" ] && command -v jq >/dev/null 2>&1; then
+      echo "[Run $i/$RUNS] k6 summary: $(jq -r '"RPS=\(.metrics.http_reqs.rate|floor) reqs=\(.metrics.http_reqs.count) p95=\(.metrics.http_req_duration["p(95)"])ms success=\(.metrics.orders_success_total.count // 0) rejected=\(.metrics.orders_business_rejection_total.count // 0) 5xx=\(.metrics.orders_system_failure_total.count // 0)"' "$summary")"
     fi
 
     echo "[Run $i/$RUNS] Running Invariant Verifier..."

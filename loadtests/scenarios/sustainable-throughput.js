@@ -2,21 +2,25 @@ import http from 'k6/http';
 import { getDeterministicUser, getDeterministicIdempotencyKey, SEEDED_CONSTANTS } from '../lib/generators.js';
 import { classifyResponse } from '../lib/assertions.js';
 
-// Stepped arrival rate to identify the throughput plateau
+// Stepped arrival rate to identify the throughput plateau.
+// Peak is set with `-e PEAK_RPS=<n>` (default 2000). Stages: 10% -> 25% -> 50% -> 100% -> 25% of peak.
+// Total requests sent ~= 59 * PEAK_RPS (seed stock accordingly, see run-benchmark.sh).
+const PEAK = parseInt(__ENV.PEAK_RPS || '2000', 10);
+
 export const options = {
   scenarios: {
     stepped_rps: {
       executor: 'ramping-arrival-rate',
-      startRate: 100,
+      startRate: Math.max(Math.round(PEAK * 0.05), 1),
       timeUnit: '1s',
-      preAllocatedVUs: 100,
-      maxVUs: 2000,
+      preAllocatedVUs: Math.min(Math.max(Math.round(PEAK / 10), 100), 2000),
+      maxVUs: Math.min(Math.max(PEAK, 2000), 8000),
       stages: [
-        { duration: '30s', target: 200 },
-        { duration: '30s', target: 500 },
-        { duration: '30s', target: 1000 },
-        { duration: '30s', target: 2000 },
-        { duration: '30s', target: 500 },
+        { duration: '30s', target: Math.round(PEAK * 0.1) },
+        { duration: '30s', target: Math.round(PEAK * 0.25) },
+        { duration: '30s', target: Math.round(PEAK * 0.5) },
+        { duration: '30s', target: PEAK },
+        { duration: '30s', target: Math.round(PEAK * 0.25) },
       ],
     },
   },

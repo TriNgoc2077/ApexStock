@@ -5,7 +5,9 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
+	"net/url"
 	"sort"
 	"strconv"
 	"strings"
@@ -67,14 +69,18 @@ type WarRoomService struct {
 
 	baseState instanceState
 	optState  instanceState
+
+	discoveredIPsMu sync.Mutex
+	discoveredIPs   map[string]map[string]time.Time
 }
 
 func NewWarRoomService(baselineURL, optimizedURL string) *WarRoomService {
 	svc := &WarRoomService{
-		baselineURL:  baselineURL,
-		optimizedURL: optimizedURL,
-		client:       &http.Client{Timeout: 1500 * time.Millisecond},
-		subscribers:  make(map[chan WarRoomSnapshot]struct{}),
+		baselineURL:   baselineURL,
+		optimizedURL:  optimizedURL,
+		client:        &http.Client{Timeout: 1500 * time.Millisecond},
+		subscribers:   make(map[chan WarRoomSnapshot]struct{}),
+		discoveredIPs: make(map[string]map[string]time.Time),
 		snapshot: WarRoomSnapshot{
 			Timestamp:    time.Now().UTC(),
 			Baseline:     ArchitectureTelemetry{Arch: "baseline", Status: "unknown"},
@@ -163,6 +169,96 @@ func (s *WarRoomService) evaluateTransition(name string, state *instanceState, c
 }
 
 func (s *WarRoomService) pollInstance(ctx context.Context, arch, baseURL string) ArchitectureTelemetry {
+	u, err := url.Parse(baseURL)
+	if err != nil {
+		return s.pollSingleEndpoint(ctx, arch, baseURL)
+	}
+
+	host := u.Hostname()
+	port := u.Port()
+	if port == "" {
+		port = "80"
+	}
+
+	// Dynamic replica discovery via DNS rotation
+	now := time.Now()
+	s.discoveredIPsMu.Lock()
+	hostMap, ok := s.discoveredIPs[host]
+	if !ok {
+		hostMap = make(map[string]time.Time)
+		s.discoveredIPs[host] = hostMap
+	}
+
+	ips, err := net.DefaultResolver.LookupIP(ctx, "ip4", host)
+	if err == nil {
+		for _, ip := range ips {
+			hostMap[ip.String()] = now
+		}
+	}
+
+	// Purge stale replica IPs not seen for > 30 seconds
+	for ipStr, seen := range hostMap {
+		if now.Sub(seen) > 30*time.Second {
+			delete(hostMap, ipStr)
+		}
+	}
+
+	allIPs := make([]string, 0, len(hostMap))
+	for ipStr := range hostMap {
+		allIPs = append(allIPs, ipStr)
+	}
+	s.discoveredIPsMu.Unlock()
+
+	if len(allIPs) <= 1 {
+		return s.pollSingleEndpoint(ctx, arch, baseURL)
+	}
+
+	telem := ArchitectureTelemetry{
+		Arch:     arch,
+		LastSeen: time.Now().UTC(),
+		Status:   "healthy",
+		Healthy:  true,
+	}
+
+	var anyHealthy bool
+	var minStock int64 = -1
+
+	for _, ipStr := range allIPs {
+		epURL := fmt.Sprintf("%s://%s:%s", u.Scheme, ipStr, port)
+		sub := s.pollSingleEndpoint(ctx, arch, epURL)
+		if sub.Healthy {
+			anyHealthy = true
+		}
+		telem.Status2xx += sub.Status2xx
+		telem.Status409 += sub.Status409
+		telem.Status429 += sub.Status429
+		telem.Status5xx += sub.Status5xx
+		if sub.OversellCount > telem.OversellCount {
+			telem.OversellCount = sub.OversellCount
+		}
+		if minStock == -1 || sub.RemainingStock < minStock {
+			minStock = sub.RemainingStock
+		}
+		if sub.P50LatencyMs > telem.P50LatencyMs {
+			telem.P50LatencyMs = sub.P50LatencyMs
+		}
+		if sub.P95LatencyMs > telem.P95LatencyMs {
+			telem.P95LatencyMs = sub.P95LatencyMs
+		}
+		if sub.P99LatencyMs > telem.P99LatencyMs {
+			telem.P99LatencyMs = sub.P99LatencyMs
+		}
+	}
+	telem.RemainingStock = minStock
+	if !anyHealthy {
+		telem.Healthy = false
+		telem.Status = "down"
+	}
+
+	return telem
+}
+
+func (s *WarRoomService) pollSingleEndpoint(ctx context.Context, arch, baseURL string) ArchitectureTelemetry {
 	telem := ArchitectureTelemetry{
 		Arch:     arch,
 		LastSeen: time.Now().UTC(),

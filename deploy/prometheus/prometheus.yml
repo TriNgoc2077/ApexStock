@@ -1,6 +1,6 @@
 global:
-  scrape_interval: 15s
-  evaluation_interval: 15s
+  scrape_interval: 2s
+  evaluation_interval: 2s
   external_labels:
     cluster: 'apexstock-local'
 
@@ -18,10 +18,14 @@ scrape_configs:
       - targets: ['api-baseline:8081']
     metrics_path: /metrics
 
-  # API Optimized (via nginx)
+  # API Optimized (Scrapes all replicas directly via Docker DNS)
   - job_name: 'api-optimized'
-    static_configs:
-      - targets: ['nginx:8082']
+    dns_sd_configs:
+      - names:
+          - 'api-optimized'
+        type: 'A'
+        port: 8082
+        refresh_interval: 2s
     metrics_path: /metrics
 
   # Worker

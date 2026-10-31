@@ -34,8 +34,8 @@ DBS=("apexstock_baseline" "apexstock_optimized")
 FLASH_SALE_ID="11111111-1111-1111-1111-111111111111"
 ITEM_ID="22222222-2222-2222-2222-222222222222"
 PRODUCT_ID="33333333-3333-3333-3333-333333333333"
-INITIAL_STOCK=10000
-MAX_PER_USER=5
+INITIAL_STOCK="${INITIAL_STOCK:-10000}"
+MAX_PER_USER="${MAX_PER_USER:-5}"
 SEEDED_USERS=50000
 USER_ID_PATTERN="33333333-3333-3333-3333-%012d"
 
@@ -89,6 +89,7 @@ for DB in "${DBS[@]}"; do
         )
         ON CONFLICT (id) DO UPDATE SET
             total_quantity = EXCLUDED.total_quantity,
+            max_per_user = EXCLUDED.max_per_user,
             sold_quantity = 0;
 
         -- Generate $SEEDED_USERS users using deterministic UUIDs
