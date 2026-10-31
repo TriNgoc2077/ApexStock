@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"time"
 
 	"apexstock/internal/baseline"
 	"apexstock/internal/config"
@@ -26,6 +27,10 @@ func main() {
 		log.Fatalf("[api-baseline] database open failed: %v", err)
 	}
 	defer db.Close()
+	db.SetMaxOpenConns(300)
+	db.SetMaxIdleConns(100)
+	db.SetConnMaxLifetime(10 * time.Minute)
+	db.SetConnMaxIdleTime(5 * time.Minute)
 	service := baseline.NewOrderService(db)
 
 	mux := http.NewServeMux()

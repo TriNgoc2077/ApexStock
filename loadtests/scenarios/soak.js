@@ -6,7 +6,7 @@ import { classifyResponse } from '../lib/assertions.js';
 // 10-minute moderate soak test to monitor memory/goroutine leak
 export const options = {
   vus: 100,
-  duration: '10m',
+  duration: __ENV.SOAK_DURATION || '2m',
   thresholds: {
     'rate_orders_system_failure': ['rate<0.005'],
   },

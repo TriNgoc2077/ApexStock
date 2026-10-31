@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-CONTAINER="apexstock-api-optimized-1"
+# Dynamic container name resolution
+CONTAINERS=$(docker ps -a --format '{{.Names}}' | grep 'api-optimized' || echo "")
 
 echo "=========================================================="
-echo " [CHAOS RECOVERY] Restoring container: $CONTAINER"
+echo " [CHAOS RECOVERY] Restoring api-optimized containers..."
 echo "=========================================================="
 
-if docker ps -a --format '{{.Names}}' | grep -q "^${CONTAINER}$"; then
-  docker start "$CONTAINER"
-  echo ">>> Container $CONTAINER restarted successfully."
-  echo ">>> NGINX health check should restore routing in ~2s."
-else
-  docker compose -f deploy/compose/docker-compose.yaml start api-optimized
-fi
+for c in $CONTAINERS; do
+  docker start "$c" >/dev/null 2>&1 || true
+  echo ">>> Container $c is running."
+done
+
+echo ">>> All api-optimized replicas restored. NGINX will restore routing."

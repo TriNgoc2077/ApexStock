@@ -25,7 +25,12 @@ func main() {
 		log.Fatal(err)
 	}
 	defer db.Close()
-	rdb := redis.NewClient(&redis.Options{Addr: cfg.RedisAddr})
+	rdb := redis.NewClient(&redis.Options{
+		Addr:         cfg.RedisAddr,
+		PoolSize:     512,  // benchmark: đủ cho 40k RPS (3 replicas × 512 = 1536 connections tổng)
+		MinIdleConns: 64,
+		PoolTimeout:  2 * time.Second,
+	})
 	defer rdb.Close()
 	nc, err := messaging.Connect(cfg.NatsURL)
 	if err != nil {

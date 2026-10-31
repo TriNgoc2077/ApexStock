@@ -1,0 +1,214 @@
+# =============================================================================
+# docker-compose.maxperf.yaml — Maximum Performance Benchmark Stack
+# =============================================================================
+# Tối ưu hóa tài nguyên cho mục tiêu 40-50k RPS trên i5-10500H (6C/12T, 15GiB RAM).
+#
+# Budget: 11.5 CPUs (để lại 0.5 cho OS + k6 scheduler)
+#         ~8.5GB RAM (để lại ~6.5GB cho OS + k6 + host)
+#
+# Phân bổ:
+#   postgres          4.0 CPUs  3.0GB  ← bottleneck chính, ưu tiên cao nhất
+#   api-baseline      4.0 CPUs  1.5GB  ← fair share cho baseline
+#   api-optimized ×3  0.75×3 CPUs 512MB×3  ← stateless, đằng sau nginx
+#   nginx             1.0 CPUs  256MB
+#   redis             1.0 CPUs  768MB
+#   nats              0.5 CPUs  256MB
+#   worker            0.25 CPUs 256MB
+#   TOTAL:           ~11.5 CPUs  ~8.5GB
+#
+# Loại bỏ: grafana, prometheus, web, warroom-controller
+# =============================================================================
+
+services:
+  # ---------------------------------------------------------------------------
+  # PostgreSQL — tuned for high-throughput OLTP
+  # ---------------------------------------------------------------------------
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: apexstock
+      POSTGRES_PASSWORD: apexstock
+      POSTGRES_DB: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - ../../deploy/docker/postgres-init.sh:/docker-entrypoint-initdb.d/01-init-databases.sh:ro
+      - ../../db/migrations:/docker-entrypoint-initdb.d/migrations:ro
+      - ../../deploy/postgres/postgresql-maxperf.conf:/etc/postgresql/postgresql.conf:ro
+      - postgres_data:/var/lib/postgresql/data
+    command: postgres -c config_file=/etc/postgresql/postgresql.conf
+    deploy:
+      resources:
+        limits:
+          cpus: "4.0"
+          memory: 3072m
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U apexstock"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    ulimits:
+      nofile:
+        soft: 65535
+        hard: 65535
+
+  # ---------------------------------------------------------------------------
+  # Redis — noeviction, pure in-memory, io-threads enabled
+  # ---------------------------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    command: >
+      redis-server
+      --maxmemory 640mb
+      --maxmemory-policy noeviction
+      --save ""
+      --appendonly no
+      --hz 100
+      --dynamic-hz yes
+      --io-threads 4
+      --io-threads-do-reads yes
+      --tcp-backlog 65535
+      --timeout 0
+      --tcp-keepalive 60
+    ports:
+      - "6379:6379"
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 768m
+    ulimits:
+      nofile:
+        soft: 65535
+        hard: 65535
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # ---------------------------------------------------------------------------
+  # NATS JetStream
+  # ---------------------------------------------------------------------------
+  nats:
+    image: nats:2.10-alpine
+    command: ["-js", "-sd", "/data", "-m", "8222"]
+    ports:
+      - "4222:4222"
+      - "8222:8222"
+    volumes:
+      - nats_data:/data
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256m
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "--quiet", "http://localhost:8222/healthz"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # ---------------------------------------------------------------------------
+  # Baseline API (:8081) — 4 CPUs để đo baseline thực sự
+  # ---------------------------------------------------------------------------
+  api-baseline:
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile.api-baseline
+    environment:
+      BASELINE_PORT: 8081
+      BASELINE_DSN: postgres://apexstock:apexstock@postgres:5432/apexstock_baseline?sslmode=disable
+      GOMAXPROCS: "8"
+    ports:
+      - "8081:8081"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ulimits:
+      nofile:
+        soft: 65535
+        hard: 65535
+    deploy:
+      resources:
+        limits:
+          cpus: "4.0"
+          memory: 1536m
+
+  # ---------------------------------------------------------------------------
+  # Optimized API (:8082) — 3 replicas × 0.75 CPU = 2.25 CPUs tổng
+  # ---------------------------------------------------------------------------
+  api-optimized:
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile.api-optimized
+    environment:
+      OPTIMIZED_PORT: 8082
+      OPTIMIZED_DSN: postgres://apexstock:apexstock@postgres:5432/apexstock_optimized?sslmode=disable
+      REDIS_ADDR: redis:6379
+      NATS_URL: nats://nats:4222
+      GOMAXPROCS: "2"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+    ulimits:
+      nofile:
+        soft: 65535
+        hard: 65535
+    deploy:
+      resources:
+        limits:
+          cpus: "0.75"
+          memory: 512m
+      replicas: 3
+
+  # ---------------------------------------------------------------------------
+  # Nginx LB
+  # ---------------------------------------------------------------------------
+  nginx:
+    image: nginx:1.27-alpine
+    ports:
+      - "8082:8082"
+    volumes:
+      - ../../deploy/nginx/nginx-maxperf.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - api-optimized
+    ulimits:
+      nofile:
+        soft: 65535
+        hard: 65535
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 256m
+
+  # ---------------------------------------------------------------------------
+  # Worker — không critical path, giảm xuống minimum
+  # ---------------------------------------------------------------------------
+  worker:
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile.worker
+    environment:
+      OPTIMIZED_DSN: postgres://apexstock:apexstock@postgres:5432/apexstock_optimized?sslmode=disable
+      NATS_URL: nats://nats:4222
+      GOMAXPROCS: "1"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 256m
+
+volumes:
+  postgres_data:
+  nats_data:

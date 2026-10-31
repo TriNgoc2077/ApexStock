@@ -100,6 +100,13 @@ func TestChaos_PaymentExpiryRace_AtomicSerialization(t *testing.T) {
 		INSERT INTO order_items (order_id, flash_sale_item_id, product_id, quantity, unit_price)
 		SELECT $1::uuid, id, product_id, 1, sale_price FROM flash_sale_items WHERE id = $2`, orderID, itemID)
 
+	_, err = db.ExecContext(ctx, `
+		INSERT INTO payments (order_id, method, amount, status)
+		VALUES ($1, 'simulated', $2, 'pending')`, orderID, totalAmount)
+	if err != nil {
+		t.Fatalf("failed to insert test payment: %v", err)
+	}
+
 	svc := payments.NewBaselineService(db)
 
 	var wg sync.WaitGroup
