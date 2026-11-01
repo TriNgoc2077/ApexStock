@@ -1,80 +1,80 @@
 # ⚡ ApexStock — High-Concurrency Flash Sale Benchmark Platform
 
-> **Báo Cáo Thực Tập Tốt Nghiệp**  
-> So sánh thực nghiệm hiệu năng giữa Kiến Trúc Truyền Thống (**Baseline**: PostgreSQL Row Locking) và Kiến Trúc Tối Ưu (**Optimized**: Redis Lua Atomic Reservation + NATS JetStream Durable Queue) dưới tải cao và kịch bản Chaos Engineering.
+> **Graduation Capstone Project**  
+> An empirical performance evaluation comparing a Traditional Architecture (**Baseline**: PostgreSQL Row Locking) against an Optimized Architecture (**Optimized**: Redis Lua Atomic Reservation + NATS JetStream Durable Queue) under extreme traffic contention and Chaos Engineering scenarios.
 
 ---
 
-## 🚀 Quick Start (Khởi Động Nhanh Trong 1 Phút)
+## 🚀 Quick Start (1-Minute Setup)
 
-### 1. Khởi động toàn bộ hệ thống
+### 1. Launch the Entire System
 ```bash
-# Khởi động cơ sở hạ tầng, 2 phiên bản API, Worker, War Room và Web UI
+# Starts core infrastructure, both API variants, Worker daemon, War Room Controller, and Next.js Web UI
 docker compose -f deploy/compose/docker-compose.yaml --profile demo up -d
 ```
 
-### 2. Khởi tạo dữ liệu mẫu (Seed & Warm-up)
+### 2. Seed & Warm Up Sample Data
 ```bash
 ./scripts/reset-data.sh && ./scripts/seed-data.sh && ./scripts/warmup-redis.sh
 ```
 
-### 3. Kiểm tra tự động toàn hệ thống (Rehearsal)
+### 3. Run Automated System Rehearsal
 ```bash
 ./scripts/demo/rehearsal.sh
 ```
 
 ---
 
-## 🌐 Các Cổng Truy Cập Dịch Vụ
+## 🌐 Service Ports & Access Points
 
-| Dịch Vụ | URL | Mục Đích |
+| Service | URL | Purpose |
 | :--- | :--- | :--- |
-| **Web UI (Next.js)** | `http://localhost:3000` | Giao diện mua hàng Flash Sale, quét mã VietQR |
-| **War Room Dashboard** | `http://localhost:3000/war-room` | Trung tâm điều khiển so sánh RPS, Latency, Invariant real-time |
-| **War Room Controller** | `http://localhost:9000` | API & SSE Stream tổng hợp metrics |
-| **Optimized API (NGINX)** | `http://localhost:8082` | Cổng phân tán tải (Redis Lua + NATS) |
-| **Baseline API** | `http://localhost:8081` | Cổng truyền thống (PostgreSQL Row Lock) |
-| **Prometheus** | `http://localhost:9090` | Thu thập metrics và cảnh báo vi phạm |
-| **Grafana** | `http://localhost:3001` | Dashboard trực quan hóa hiệu năng |
+| **Web UI (Next.js)** | `http://localhost:3000` | Flash sale shopping storefront & VietQR payment checkout |
+| **War Room Dashboard** | `http://localhost:3000/war-room` | Real-time control center comparing RPS, latency, and invariants |
+| **War Room Controller** | `http://localhost:9000` | Telemetry aggregation API & SSE event stream |
+| **Optimized API (NGINX)** | `http://localhost:8082` | Distributed load gateway (Redis Lua + NATS JetStream) |
+| **Baseline API** | `http://localhost:8081` | Traditional architecture endpoint (PostgreSQL Row Lock) |
+| **Prometheus** | `http://localhost:9090` | Metrics scraper and invariant violation alerting |
+| **Grafana** | `http://localhost:3001` | Pre-provisioned analytical performance dashboards |
 
 ---
 
-## 🛡️ Chứng Nhận Invariant & Không Bị Oversell
+## 🛡️ Invariant Verification & Zero Overselling Guarantee
 
-Hệ thống cam kết 5 Invariant bất biến toán học:
-- **I1:** `Kho khả dụng + Đơn đang giữ + Đơn đã thanh toán == Tổng số lượng ban đầu` (Tuyệt đối không oversell).
-- **I2:** Mọi yêu cầu giữ hàng đều kết thúc ở trạng thái `confirmed` hoặc `released`.
-- **I3:** Mỗi `idempotency_key` tạo ra tối đa đúng một đơn hàng.
-- **I4:** Trạng thái đơn hàng và thanh toán tuân thủ nghiêm ngặt State Machine.
-- **I5:** Worker xử lý mỗi sự kiện JetStream tối đa một lần (`processed_events`).
+ApexStock strictly enforces 5 mathematical system invariants:
+- **I1:** `Available Stock + Reserved Stock + Paid Quantity == Initial Total Quantity` (Zero overselling guaranteed).
+- **I2:** Every stock reservation request terminates in either a `confirmed` or `released` state.
+- **I3:** Each `idempotency_key` creates at most one order.
+- **I4:** Order and payment lifecycles strictly adhere to a deterministic State Machine.
+- **I5:** Worker processes each JetStream message at most once (`processed_events` deduplication).
 
-Kiểm tra Invariant bất kỳ lúc nào bằng lệnh:
+Verify all invariants at any time using the automated reconciliation tool:
 ```bash
 ./scripts/reconcile.sql.sh
 ```
 
 ---
 
-## 📊 Kịch Bản Chạy Benchmark (k6)
+## 📊 Benchmark Scenarios (k6)
 
-Chạy benchmark so sánh tuần tự công bằng (Tuân thủ Decision Gate D0.11):
+Run fair, sequential load tests adhering to Decision Gate D0.11:
 ```bash
-# Đo đột biến tranh chấp kho (Flash-sale Shock Contention)
+# Flash-sale inventory contention shock test
 ./scripts/benchmark/run-benchmark.sh flash-sale-shock 3
 
-# Đo thông lượng tối đa bền vững (Plateau Stepped RPS)
+# Maximum sustainable throughput measurement (Plateau Stepped RPS)
 ./scripts/benchmark/run-benchmark.sh sustainable-throughput 3
 ```
 
 ---
 
-## 💥 Thao Tác Kịch Bản Chaos (Dành Cho Operator)
+## 💥 Chaos Scenarios (Operator Drills)
 
-Tuân thủ Decision Gate D0.12 (không có nút bấm nguy hiểm trên Web):
+In accordance with Decision Gate D0.12 (no destructive actions exposed via browser UI):
 ```bash
-# Mô phỏng sập 1 instance API Optimized
+# Simulate failure of an Optimized API instance under load
 ./scripts/chaos/kill-optimized-api.sh
 
-# Phục hồi instance và quan sát thời gian tự phục hồi trên War Room
+# Restore the instance and observe real-time recovery on the War Room
 ./scripts/chaos/restore-optimized-api.sh
 ```
