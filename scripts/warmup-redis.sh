@@ -62,8 +62,8 @@ while IFS='|' read -r item total sold reserved; do
     echo "ERROR: negative reconstructed stock for item $item" >&2
     exit 1
   fi
-  run_redis SET "flash_item:$item:stock" "$stock" >/dev/null
-  run_redis DEL "flash_item:$item:reserved" >/dev/null
+  run_redis SET "flash_item:$item:stock" "$stock" </dev/null >/dev/null
+  run_redis DEL "flash_item:$item:reserved" </dev/null >/dev/null
   echo "SET flash_item:$item:stock=$stock (reserved=$reserved)"
 done
 
@@ -77,8 +77,8 @@ WHERE o.status = 'pending_payment' AND o.expires_at > now();
 SQL
 while IFS='|' read -r item expiry member user_id qty; do
   [ -z "$item" ] && continue
-  run_redis ZADD "flash_item:$item:reserved" "$expiry" "$member" >/dev/null
-  run_redis INCRBY "flash_item:$item:user:$user_id" "$qty" >/dev/null
+  run_redis ZADD "flash_item:$item:reserved" "$expiry" "$member" </dev/null >/dev/null
+  run_redis INCRBY "flash_item:$item:user:$user_id" "$qty" </dev/null >/dev/null
 done
 
 echo "Redis warm-up complete"
